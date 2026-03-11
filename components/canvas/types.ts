@@ -1,40 +1,9 @@
-export type ViewerMode = "anonymous" | "authenticated";
+import type { CreateNodeRequest, CreateNodeResponse, UpdateNodePositionResponse } from "@/lib/types/api";
+import type { CanvasDetail, Node, NodePosition } from "@/lib/types/domain";
 
-export type CanvasNodeImage = {
-  url: string;
-  alt: string;
-};
-
-export type CanvasNodeData = {
-  id: string;
-  title: string;
-  excerpt: string;
-  body: string;
-  createdBy: string;
-  createdAt: string;
-  isEnding: boolean;
-  endingType: "user" | "auto_limit" | null;
-  position: {
-    x: number;
-    y: number;
-  };
-  image?: CanvasNodeImage;
-};
-
-export type CanvasEdgeData = {
-  id: string;
-  sourceId: string;
-  targetId: string;
-};
-
-export type CanvasWorkspaceData = {
-  id: string;
-  shareKey: string;
-  title: string;
-  subtitle: string;
-  viewerMode: ViewerMode;
-  maxUserNodesPerBranch: number;
-  selectedNodeId: string;
-  nodes: CanvasNodeData[];
-  edges: CanvasEdgeData[];
-};
+export type CanvasWorkspaceData = CanvasDetail;
+export type CanvasWorkspaceNode = Node;
+export type CanvasPositionPayload = NodePosition;
+export type CreateCanvasNodeInput = CreateNodeRequest;
+export type CreateCanvasNodeResult = CreateNodeResponse;
+export type PersistNodePositionResult = UpdateNodePositionResponse;

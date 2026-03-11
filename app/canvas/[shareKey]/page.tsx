@@ -1,18 +1,28 @@
-import { CanvasWorkspace } from "../../../components/canvas/CanvasWorkspace";
-import { getMockCanvasWorkspace } from "../../../components/canvas/mockCanvasData";
+import { notFound } from "next/navigation";
+import { CanvasWorkspace } from "@/components/canvas/CanvasWorkspace";
+import { getSession } from "@/lib/auth/server";
+import { ApiError } from "@/lib/server/errors";
+import { getCanvasDetailByShareKey } from "@/lib/services/canvas";
 
 type CanvasPageProps = {
-  params: {
+  params: Promise<{
     shareKey: string;
-  };
-  searchParams?: {
-    mode?: string;
-  };
+  }>;
 };
 
-export default function CanvasPage({ params, searchParams }: CanvasPageProps) {
-  const viewerMode = searchParams?.mode === "guest" ? "anonymous" : "authenticated";
-  const workspace = getMockCanvasWorkspace(params.shareKey, viewerMode);
+export default async function CanvasPage({ params }: CanvasPageProps) {
+  const { shareKey } = await params;
+  const viewer = await getSession();
 
-  return <CanvasWorkspace workspace={workspace} />;
+  try {
+    const detail = await getCanvasDetailByShareKey(shareKey, viewer);
+
+    return <CanvasWorkspace detail={detail} />;
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 404) {
+      notFound();
+    }
+
+    throw error;
+  }
 }

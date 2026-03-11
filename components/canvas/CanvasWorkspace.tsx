@@ -1,16 +1,17 @@
 "use client";
 
 import { type PointerEvent as ReactPointerEvent, useEffect, useRef, useState } from "react";
-import { persistNodePosition } from "./canvasApi";
+import { createCanvasNode, persistNodePosition } from "./canvasApi";
 import styles from "./CanvasWorkspace.module.css";
-import { CanvasNodeData, CanvasWorkspaceData } from "./types";
+import { CanvasWorkspaceData, CanvasWorkspaceNode } from "./types";
 
 const NODE_WIDTH = 220;
 const NODE_HEIGHT = 128;
-const MINIMAP_SCALE = 0.16;
+const MINIMAP_WIDTH = 188;
+const MINIMAP_HEIGHT = 88;
 
 type CanvasWorkspaceProps = {
-  workspace: CanvasWorkspaceData;
+  detail: CanvasWorkspaceData;
 };
 
 type DragState = {
@@ -19,17 +20,43 @@ type DragState = {
   offsetY: number;
 } | null;
 
-export function CanvasWorkspace({ workspace }: CanvasWorkspaceProps) {
-  const [nodes, setNodes] = useState(workspace.nodes);
-  const [selectedNodeId, setSelectedNodeId] = useState(workspace.selectedNodeId);
+export function CanvasWorkspace({ detail }: CanvasWorkspaceProps) {
+  const [nodes, setNodes] = useState(detail.nodes);
+  const [selectedNodeId, setSelectedNodeId] = useState(detail.nodes[0]?.id ?? "");
   const [writeOpen, setWriteOpen] = useState(false);
   const [summaryOpen, setSummaryOpen] = useState(false);
   const [draftText, setDraftText] = useState("");
+  const [endingChecked, setEndingChecked] = useState(false);
   const [dragState, setDragState] = useState<DragState>(null);
   const [copied, setCopied] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitMessage, setSubmitMessage] = useState<string | null>(null);
   const nodesRef = useRef(nodes);
+  const canvasInnerRef = useRef<HTMLDivElement | null>(null);
 
   const selectedNode = nodes.find((node) => node.id === selectedNodeId) ?? nodes[0];
+  const viewerMode = detail.viewer ? "authenticated" : "anonymous";
+  const shareHref = `/canvas/${detail.canvas.shareKey}`;
+  const readHref =
+    selectedNode && selectedNode.isEnding ? `/read/${detail.canvas.shareKey}/${selectedNode.id}` : null;
+  const canvasWidth = Math.max(1520, ...nodes.map((node) => node.position.x + NODE_WIDTH + 220));
+  const canvasHeight = Math.max(920, ...nodes.map((node) => node.position.y + NODE_HEIGHT + 240));
+
+  if (!selectedNode) {
+    return (
+      <main className={styles.page}>
+        <section className={styles.workspace}>
+          <div className={styles.topBar}>
+            <div className={styles.titleBlock}>
+              <span className={styles.eyebrow}>Role 2 canvas workspace</span>
+              <h1 className={styles.title}>{detail.canvas.title}</h1>
+              <p className={styles.subtitle}>No nodes were returned for this canvas yet.</p>
+            </div>
+          </div>
+        </section>
+      </main>
+    );
+  }
 
   useEffect(() => {
     nodesRef.current = nodes;
@@ -41,14 +68,20 @@ export function CanvasWorkspace({ workspace }: CanvasWorkspaceProps) {
     }
 
     function handlePointerMove(event: PointerEvent) {
+      const pointer = getCanvasPointerPosition(event, canvasInnerRef.current);
+
+      if (!pointer) {
+        return;
+      }
+
       setNodes((currentNodes) =>
         currentNodes.map((node) =>
           node.id === dragState.nodeId
             ? {
                 ...node,
                 position: {
-                  x: Math.max(60, event.clientX - dragState.offsetX),
-                  y: Math.max(160, event.clientY - dragState.offsetY),
+                  x: Math.max(60, pointer.x - dragState.offsetX),
+                  y: Math.max(80, pointer.y - dragState.offsetY),
                 },
               }
             : node,
@@ -59,8 +92,16 @@ export function CanvasWorkspace({ workspace }: CanvasWorkspaceProps) {
     async function handlePointerUp() {
       const movedNode = nodesRef.current.find((node) => node.id === dragState.nodeId);
 
-      if (movedNode && workspace.viewerMode === "authenticated") {
-        await persistNodePosition(movedNode.id, movedNode.position);
+      if (movedNode && viewerMode === "authenticated") {
+        try {
+          const result = await persistNodePosition(movedNode.id, movedNode.position);
+
+          setNodes((currentNodes) =>
+            currentNodes.map((node) => (node.id === result.node.id ? result.node : node)),
+          );
+        } catch (error) {
+          setSubmitMessage(error instanceof Error ? error.message : "Could not save node position.");
+        }
       }
 
       setDragState(null);
@@ -73,7 +114,7 @@ export function CanvasWorkspace({ workspace }: CanvasWorkspaceProps) {
       window.removeEventListener("pointermove", handlePointerMove);
       window.removeEventListener("pointerup", handlePointerUp);
     };
-  }, [dragState, workspace.viewerMode]);
+  }, [dragState, viewerMode]);
 
   useEffect(() => {
     if (!copied) {
@@ -84,13 +125,20 @@ export function CanvasWorkspace({ workspace }: CanvasWorkspaceProps) {
     return () => window.clearTimeout(timeout);
   }, [copied]);
 
-  function handleSelect(node: CanvasNodeData) {
+  function handleSelect(node: CanvasWorkspaceNode) {
     setSelectedNodeId(node.id);
     setWriteOpen(false);
+    setSubmitMessage(null);
   }
 
-  function handlePointerDown(node: CanvasNodeData, event: ReactPointerEvent<HTMLButtonElement>) {
-    if (workspace.viewerMode !== "authenticated") {
+  function handlePointerDown(node: CanvasWorkspaceNode, event: ReactPointerEvent<HTMLButtonElement>) {
+    if (viewerMode !== "authenticated") {
+      return;
+    }
+
+    const pointer = getCanvasPointerPosition(event.nativeEvent, canvasInnerRef.current);
+
+    if (!pointer) {
       return;
     }
 
@@ -99,21 +147,74 @@ export function CanvasWorkspace({ workspace }: CanvasWorkspaceProps) {
     setWriteOpen(false);
     setDragState({
       nodeId: node.id,
-      offsetX: event.clientX - node.position.x,
-      offsetY: event.clientY - node.position.y,
+      offsetX: pointer.x - node.position.x,
+      offsetY: pointer.y - node.position.y,
     });
   }
 
   async function handleCopyLink() {
     try {
-      await navigator.clipboard.writeText(`/canvas/${workspace.shareKey}`);
+      await navigator.clipboard.writeText(window.location.href);
       setCopied(true);
     } catch {
       setCopied(false);
     }
   }
 
-  const readHref = `/read/${workspace.shareKey}/${selectedNode.id}`;
+  async function handlePublish() {
+    if (!selectedNode) {
+      return;
+    }
+
+    if (!draftText.trim()) {
+      setSubmitMessage("Write the next node content before publishing.");
+      return;
+    }
+
+    setIsSubmitting(true);
+    setSubmitMessage(null);
+
+    try {
+      const siblingCount = nodes.filter((node) => node.parentNodeId === selectedNode.id).length;
+      const nextPosition = {
+        x: selectedNode.position.x + 320,
+        y: selectedNode.position.y + siblingCount * 180 - (siblingCount > 0 ? 90 : 0),
+      };
+
+      const result = await createCanvasNode({
+        canvasId: detail.canvas.id,
+        parentNodeId: selectedNode.id,
+        content: draftText.trim(),
+        position: nextPosition,
+        isEnding: endingChecked,
+      });
+
+      setNodes((currentNodes) => {
+        const nextNodes = [...currentNodes, result.node];
+
+        if (result.autoEndingNode) {
+          nextNodes.push(result.autoEndingNode);
+        }
+
+        return nextNodes;
+      });
+
+      setSelectedNodeId(result.autoEndingNode?.id ?? result.node.id);
+      setWriteOpen(false);
+      setDraftText("");
+      setEndingChecked(false);
+      setSummaryOpen(false);
+      setSubmitMessage(
+        result.autoEndingNode
+          ? "Node published and the branch auto-completed at max depth."
+          : "Node published.",
+      );
+    } catch (error) {
+      setSubmitMessage(error instanceof Error ? error.message : "Could not publish the next node.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
 
   return (
     <main className={styles.page}>
@@ -121,14 +222,16 @@ export function CanvasWorkspace({ workspace }: CanvasWorkspaceProps) {
         <header className={styles.topBar}>
           <div className={styles.titleBlock}>
             <span className={styles.eyebrow}>Role 2 canvas workspace</span>
-            <h1 className={styles.title}>{workspace.title}</h1>
-            <p className={styles.subtitle}>{workspace.subtitle}</p>
+            <h1 className={styles.title}>{detail.canvas.title}</h1>
+            <p className={styles.subtitle}>
+              Share key: {detail.canvas.shareKey} · Max branch depth: {detail.canvas.maxUserNodesPerBranch}
+            </p>
           </div>
           <div className={styles.actions}>
             <button className={styles.pill} onClick={handleCopyLink} type="button">
               {copied ? "Link copied" : "Copy link"}
             </button>
-            {selectedNode.isEnding ? (
+            {readHref ? (
               <a className={styles.primaryPill} href={readHref}>
                 Read branch
               </a>
@@ -136,41 +239,42 @@ export function CanvasWorkspace({ workspace }: CanvasWorkspaceProps) {
               <span className={styles.statusPill}>Select an ending node to read</span>
             )}
             <span className={styles.statusPill}>
-              {workspace.viewerMode === "authenticated"
-                ? "Logged in: can write and move nodes"
+              {viewerMode === "authenticated"
+                ? `Logged in as ${detail.viewer?.nickname ?? "writer"}`
                 : "Guest mode: read only, login to write"}
             </span>
           </div>
         </header>
 
         <div className={styles.canvasSurface}>
-          <div className={styles.canvasInner}>
+          <div
+            className={styles.canvasInner}
+            ref={canvasInnerRef}
+            style={{ width: canvasWidth, height: canvasHeight }}
+          >
             <svg className={styles.edgeLayer}>
-              {workspace.edges.map((edge) => {
-                const source = nodes.find((node) => node.id === edge.sourceId);
-                const target = nodes.find((node) => node.id === edge.targetId);
+              {nodes
+                .filter((node) => node.parentNodeId)
+                .map((node) => {
+                  const source = nodes.find((candidate) => candidate.id === node.parentNodeId);
 
-                if (!source || !target) {
-                  return null;
-                }
+                  if (!source) {
+                    return null;
+                  }
 
-                const sourceX = source.position.x + NODE_WIDTH;
-                const sourceY = source.position.y + NODE_HEIGHT / 2;
-                const targetX = target.position.x;
-                const targetY = target.position.y + NODE_HEIGHT / 2;
-                const deltaX = (targetX - sourceX) / 2;
-                const path = `M ${sourceX} ${sourceY} C ${sourceX + deltaX} ${sourceY}, ${targetX - deltaX} ${targetY}, ${targetX} ${targetY}`;
+                  const sourceX = source.position.x + NODE_WIDTH;
+                  const sourceY = source.position.y + NODE_HEIGHT / 2;
+                  const targetX = node.position.x;
+                  const targetY = node.position.y + NODE_HEIGHT / 2;
+                  const deltaX = (targetX - sourceX) / 2;
+                  const path = `M ${sourceX} ${sourceY} C ${sourceX + deltaX} ${sourceY}, ${targetX - deltaX} ${targetY}, ${targetX} ${targetY}`;
 
-                return <path key={edge.id} className={styles.edgePath} d={path} />;
-              })}
+                  return <path key={`${source.id}-${node.id}`} className={styles.edgePath} d={path} />;
+                })}
             </svg>
 
             {nodes.map((node) => {
-              const typeLabel = node.isEnding
-                ? node.endingType === "auto_limit"
-                  ? "Auto ending"
-                  : "Ending"
-                : "Story node";
+              const typeLabel = getNodeTypeLabel(node);
 
               return (
                 <button
@@ -179,7 +283,7 @@ export function CanvasWorkspace({ workspace }: CanvasWorkspaceProps) {
                     styles.nodeCard,
                     selectedNodeId === node.id ? styles.nodeSelected : "",
                     node.isEnding ? styles.nodeEnding : "",
-                    node.endingType === "auto_limit" ? styles.nodeAutoEnding : "",
+                    node.endingType === "auto-max-depth" ? styles.nodeAutoEnding : "",
                   ].join(" ")}
                   onClick={() => handleSelect(node)}
                   onPointerDown={(event) => handlePointerDown(node, event)}
@@ -190,8 +294,8 @@ export function CanvasWorkspace({ workspace }: CanvasWorkspaceProps) {
                   type="button"
                 >
                   <span className={styles.nodeType}>{typeLabel}</span>
-                  <h2 className={styles.nodeTitle}>{node.title}</h2>
-                  <p className={styles.nodeExcerpt}>{node.excerpt}</p>
+                  <h2 className={styles.nodeTitle}>{getNodeHeading(node)}</h2>
+                  <p className={styles.nodeExcerpt}>{getExcerpt(node.content)}</p>
                 </button>
               );
             })}
@@ -201,17 +305,17 @@ export function CanvasWorkspace({ workspace }: CanvasWorkspaceProps) {
         <aside className={styles.drawer}>
           <div className={styles.drawerContent}>
             <span className={styles.sectionLabel}>Selected node</span>
-            <h2 className={styles.drawerTitle}>{selectedNode.title}</h2>
+            <h2 className={styles.drawerTitle}>{getNodeHeading(selectedNode)}</h2>
             <div className={styles.metaRow}>
-              {selectedNode.createdBy} · {selectedNode.createdAt}
+              {getNodeTypeLabel(selectedNode)} · {selectedNode.createdAt}
             </div>
-            <p className={styles.bodyCopy}>{selectedNode.body}</p>
+            <p className={styles.bodyCopy}>{selectedNode.content}</p>
             <div className={styles.buttonRow}>
               {selectedNode.isEnding ? (
-                <a className={styles.tertiaryButton} href={readHref}>
+                <a className={styles.tertiaryButton} href={readHref ?? shareHref}>
                   Open reader
                 </a>
-              ) : workspace.viewerMode === "authenticated" ? (
+              ) : viewerMode === "authenticated" ? (
                 <button
                   className={styles.primaryButton}
                   onClick={() => setWriteOpen((current) => !current)}
@@ -220,7 +324,7 @@ export function CanvasWorkspace({ workspace }: CanvasWorkspaceProps) {
                   {writeOpen ? "Close write panel" : "Write next node"}
                 </button>
               ) : (
-                <a className={styles.primaryButton} href="/login">
+                <a className={styles.primaryButton} href={`/login?next=${encodeURIComponent(shareHref)}`}>
                   Login to write
                 </a>
               )}
@@ -233,7 +337,7 @@ export function CanvasWorkspace({ workspace }: CanvasWorkspaceProps) {
               <section className={styles.writePanel}>
                 <span className={styles.sectionLabel}>Write next node</span>
                 <label className={styles.fieldLabel}>Parent context</label>
-                <div className={styles.contextBox}>{selectedNode.body}</div>
+                <div className={styles.contextBox}>{selectedNode.content}</div>
 
                 <button
                   className={styles.summaryToggle}
@@ -262,29 +366,40 @@ export function CanvasWorkspace({ workspace }: CanvasWorkspaceProps) {
                 />
 
                 <div className={styles.inlineTools}>
-                  <button className={styles.secondaryButton} type="button">
+                  <button className={styles.secondaryButton} disabled type="button">
                     Upload image
                   </button>
-                  <button className={styles.secondaryButton} type="button">
+                  <button className={styles.secondaryButton} disabled type="button">
                     AI image
                   </button>
                   <label className={styles.checkboxRow}>
-                    <input type="checkbox" />
+                    <input
+                      checked={endingChecked}
+                      onChange={(event) => setEndingChecked(event.target.checked)}
+                      type="checkbox"
+                    />
                     Mark this node as ending
                   </label>
                 </div>
 
                 <p className={styles.helperText}>
-                  Drafts, media, and final publish will connect to Role 1 and Role 4 routes.
+                  Role 4 media hooks are still pending. Publish already hits the real Role 1 node API.
                 </p>
 
                 <div className={styles.buttonRow}>
-                  <button className={styles.primaryButton} type="button">
-                    Confirm and publish
+                  <button
+                    className={styles.primaryButton}
+                    disabled={isSubmitting}
+                    onClick={handlePublish}
+                    type="button"
+                  >
+                    {isSubmitting ? "Publishing..." : "Confirm and publish"}
                   </button>
                 </div>
               </section>
             ) : null}
+
+            {submitMessage ? <p className={styles.helperText}>{submitMessage}</p> : null}
           </div>
         </aside>
 
@@ -296,8 +411,8 @@ export function CanvasWorkspace({ workspace }: CanvasWorkspaceProps) {
                 key={`mini-${node.id}`}
                 className={styles.miniNode}
                 style={{
-                  left: 10 + node.position.x * MINIMAP_SCALE,
-                  top: 8 + (node.position.y - 160) * MINIMAP_SCALE,
+                  left: 10 + (node.position.x / canvasWidth) * MINIMAP_WIDTH,
+                  top: 8 + (node.position.y / canvasHeight) * MINIMAP_HEIGHT,
                 }}
               />
             ))}
@@ -311,4 +426,56 @@ export function CanvasWorkspace({ workspace }: CanvasWorkspaceProps) {
       </section>
     </main>
   );
+}
+
+function getCanvasPointerPosition(
+  event: PointerEvent,
+  canvasInner: HTMLDivElement | null,
+) {
+  if (!canvasInner) {
+    return null;
+  }
+
+  const rect = canvasInner.getBoundingClientRect();
+
+  return {
+    x: event.clientX - rect.left,
+    y: event.clientY - rect.top,
+  };
+}
+
+function getNodeHeading(node: CanvasWorkspaceNode) {
+  if (node.parentNodeId === null) {
+    return "Root node";
+  }
+
+  if (node.isEnding && node.endingType === "auto-max-depth") {
+    return "Auto ending";
+  }
+
+  if (node.isEnding) {
+    return "Ending node";
+  }
+
+  return "Story node";
+}
+
+function getNodeTypeLabel(node: CanvasWorkspaceNode) {
+  if (node.parentNodeId === null) {
+    return "Root";
+  }
+
+  if (node.isEnding && node.endingType === "auto-max-depth") {
+    return "Auto ending";
+  }
+
+  if (node.isEnding) {
+    return "Ending";
+  }
+
+  return "Branch";
+}
+
+function getExcerpt(content: string) {
+  return content.length > 96 ? `${content.slice(0, 96)}...` : content;
 }
