@@ -1,5 +1,12 @@
 import type { AuthSession, AuthUser } from "@/lib/types/auth";
-import type { Canvas, CanvasDetail, Node, NodePosition, ParticipatedCanvas } from "@/lib/types/domain";
+import type {
+  Canvas,
+  CanvasDetail,
+  Node,
+  NodePosition,
+  ParticipatedCanvas,
+  ReaderBranchContent
+} from "@/lib/types/domain";
 
 export type SignupRequest = {
   email: string;
@@ -57,4 +64,8 @@ export type UpdateNodePositionRequest = {
 
 export type UpdateNodePositionResponse = {
   node: Node;
+};
+
+export type ReaderBranchResponse = {
+  branch: ReaderBranchContent;
 };

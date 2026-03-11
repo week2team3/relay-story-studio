@@ -59,6 +59,27 @@ export type ReaderBranch = {
   summary: SummarySnapshot | null;
 };
 
+export type ReaderSegment =
+  | {
+      nodeId: string;
+      kind: "text";
+      text: string;
+    }
+  | {
+      nodeId: string;
+      kind: "image";
+      imageUrl: string;
+      imageAlt: string;
+    };
+
+export type ReaderBranchContent = {
+  canvas: Pick<Canvas, "id" | "title" | "shareKey">;
+  endingNodeId: string;
+  endingType: Exclude<EndingType, null>;
+  sharePath: string;
+  segments: ReaderSegment[];
+};
+
 export type CanvasDetail = {
   canvas: Canvas;
   nodes: Node[];
