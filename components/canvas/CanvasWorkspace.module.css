@@ -97,13 +97,14 @@
   position: relative;
   min-height: 100dvh;
   overflow: auto;
-  padding: 132px 20px 20px;
+  padding: 24px 20px 128px;
   background-image:
     linear-gradient(rgba(47, 34, 22, 0.045) 1px, transparent 1px),
     linear-gradient(90deg, rgba(47, 34, 22, 0.045) 1px, transparent 1px);
   background-position: 0 0, 0 0;
   background-size: 28px 28px;
   cursor: grab;
+  overscroll-behavior: none;
 }
 
 .canvasSurfacePanning {
@@ -111,11 +112,39 @@
   user-select: none;
 }
 
+.canvasSurfacePanning * {
+  cursor: grabbing !important;
+}
+
 .canvasInner {
   position: relative;
   border-radius: 30px;
   min-width: 100%;
   min-height: calc(100dvh - 160px);
+}
+
+.constraintZone {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: linear-gradient(90deg, rgba(208, 47, 47, 0.14), rgba(208, 47, 47, 0.03));
+  border-right: 2px dashed rgba(208, 47, 47, 0.5);
+  pointer-events: none;
+}
+
+.constraintLabel {
+  position: sticky;
+  top: 28px;
+  width: fit-content;
+  max-width: 220px;
+  margin: 28px auto 0;
+  padding: 12px 14px;
+  border-radius: 16px;
+  background: rgba(130, 28, 28, 0.9);
+  color: #fff2f2;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.5;
+  text-align: center;
 }
 
 .edgeLayer {
@@ -144,11 +173,16 @@
   cursor: pointer;
   user-select: none;
   transition: transform 140ms ease, box-shadow 140ms ease, border-color 140ms ease;
+  cursor: grab;
 }
 
 .nodeCard:hover {
   transform: translateY(-2px);
   box-shadow: 0 24px 44px rgba(23, 32, 47, 0.1);
+}
+
+.nodeCard:active {
+  cursor: grabbing;
 }
 
 .nodeSelected {
@@ -193,11 +227,11 @@
 
 .drawer {
   position: absolute;
-  top: 114px;
+  top: 24px;
   right: 20px;
   z-index: 25;
   width: min(370px, calc(100vw - 40px));
-  max-height: calc(100dvh - 134px);
+  max-height: calc(100dvh - 148px);
   overflow: auto;
   border: 1px solid var(--line);
   border-radius: 28px;
@@ -364,7 +398,7 @@
   bottom: 24px;
   z-index: 20;
   width: 232px;
-  padding: 16px;
+  padding: 14px;
   border: 1px solid var(--line);
   border-radius: 24px;
   background: rgba(255, 251, 245, 0.58);
@@ -372,8 +406,12 @@
   box-shadow: 0 18px 36px rgba(71, 45, 29, 0.08);
 }
 
+.miniMapChrome {
+  margin-bottom: 10px;
+}
+
 .miniMapTitle {
-  margin: 0 0 10px;
+  margin: 0;
   color: var(--accent-strong);
   font-size: 12px;
   font-weight: 800;
@@ -387,6 +425,7 @@
   border-radius: 16px;
   background: rgba(248, 240, 230, 0.94);
   overflow: hidden;
+  cursor: crosshair;
 }
 
 .miniNode {
@@ -402,13 +441,74 @@
   position: absolute;
   border: 2px solid var(--accent);
   border-radius: 8px;
+  background: rgba(184, 92, 56, 0.1);
+  box-shadow: inset 0 0 0 1px rgba(255, 246, 238, 0.6);
 }
 
 .miniCaption {
-  margin: 10px 0 0;
+  margin: 6px 0 0;
   color: var(--muted);
   font-size: 12px;
   line-height: 1.45;
+}
+
+.controlDock {
+  position: fixed;
+  left: 50%;
+  bottom: 18px;
+  z-index: 40;
+  display: grid;
+  gap: 10px;
+  transform: translateX(-50%);
+  justify-items: center;
+}
+
+.controlPanel {
+  width: min(760px, calc(100vw - 32px));
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  background: rgba(255, 251, 245, 0.94);
+  backdrop-filter: blur(18px);
+  box-shadow: var(--shadow);
+}
+
+.controlHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.controlTitle {
+  margin: 0;
+  font-size: 1.2rem;
+}
+
+.controlActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.controlDockButton,
+.controlToggle {
+  border: 1px solid var(--accent-strong);
+  border-radius: 999px;
+  background: var(--accent);
+  color: #fff6ee;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 12px 18px;
+  box-shadow: 0 16px 32px rgba(71, 45, 29, 0.12);
+}
+
+.controlToggle {
+  background: rgba(255, 251, 245, 0.92);
+  color: var(--accent-strong);
+  border-color: var(--line);
+  box-shadow: none;
 }
 
 @media (max-width: 1080px) {
@@ -424,9 +524,27 @@
     left: 20px;
     right: 20px;
     width: auto;
+    top: 20px;
+    max-height: calc(100dvh - 260px);
   }
 
   .miniMap {
     width: 196px;
+  }
+
+  .controlPanel {
+    width: min(92vw, 760px);
+  }
+}
+
+@media (max-width: 760px) {
+  .canvasSurface {
+    padding-bottom: 154px;
+  }
+
+  .drawer {
+    top: auto;
+    bottom: 160px;
+    max-height: calc(100dvh - 220px);
   }
 }

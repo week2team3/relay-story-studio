@@ -9,6 +9,7 @@ const NODE_WIDTH = 220;
 const NODE_HEIGHT = 128;
 const MINIMAP_WIDTH = 188;
 const MINIMAP_HEIGHT = 88;
+const MIN_CHILD_X_GAP = 36;
 
 type CanvasWorkspaceProps = {
   detail: CanvasWorkspaceData;
@@ -27,6 +28,13 @@ type PanState = {
   startScrollTop: number;
 } | null;
 
+type ViewportState = {
+  scrollLeft: number;
+  scrollTop: number;
+  width: number;
+  height: number;
+};
+
 export function CanvasWorkspace({ detail }: CanvasWorkspaceProps) {
   const [nodes, setNodes] = useState(detail.nodes);
   const [selectedNodeId, setSelectedNodeId] = useState(detail.nodes[0]?.id ?? "");
@@ -36,24 +44,87 @@ export function CanvasWorkspace({ detail }: CanvasWorkspaceProps) {
   const [endingChecked, setEndingChecked] = useState(false);
   const [dragState, setDragState] = useState<DragState>(null);
   const [panState, setPanState] = useState<PanState>(null);
+  const [miniMapDragging, setMiniMapDragging] = useState(false);
+  const [controlsOpen, setControlsOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitMessage, setSubmitMessage] = useState<string | null>(null);
+  const [viewport, setViewport] = useState<ViewportState>({
+    scrollLeft: 0,
+    scrollTop: 0,
+    width: 0,
+    height: 0,
+  });
   const nodesRef = useRef(nodes);
   const canvasSurfaceRef = useRef<HTMLDivElement | null>(null);
   const canvasInnerRef = useRef<HTMLDivElement | null>(null);
+  const miniMapFrameRef = useRef<HTMLDivElement | null>(null);
+  const initializedViewportRef = useRef(false);
 
   const selectedNode = nodes.find((node) => node.id === selectedNodeId) ?? nodes[0];
+  const rootNode = nodes.find((node) => node.parentNodeId === null) ?? nodes[0];
   const viewerMode = detail.viewer ? "authenticated" : "anonymous";
   const shareHref = `/canvas/${detail.canvas.shareKey}`;
   const readHref =
     selectedNode && selectedNode.isEnding ? `/read/${detail.canvas.shareKey}/${selectedNode.id}` : null;
   const canvasWidth = Math.max(1520, ...nodes.map((node) => node.position.x + NODE_WIDTH + 220));
   const canvasHeight = Math.max(920, ...nodes.map((node) => node.position.y + NODE_HEIGHT + 240));
+  const activeDragNode = dragState ? nodes.find((node) => node.id === dragState.nodeId) ?? null : null;
+  const activeParentNode =
+    activeDragNode?.parentNodeId
+      ? nodes.find((node) => node.id === activeDragNode.parentNodeId) ?? null
+      : null;
+  const forbiddenBoundaryX = activeParentNode
+    ? activeParentNode.position.x + NODE_WIDTH + MIN_CHILD_X_GAP
+    : null;
+  const miniViewportWidth = clamp((viewport.width / canvasWidth) * MINIMAP_WIDTH, 40, MINIMAP_WIDTH);
+  const miniViewportHeight = clamp((viewport.height / canvasHeight) * MINIMAP_HEIGHT, 34, MINIMAP_HEIGHT);
+  const miniViewportLeft = clamp((viewport.scrollLeft / canvasWidth) * MINIMAP_WIDTH, 0, MINIMAP_WIDTH - miniViewportWidth);
+  const miniViewportTop = clamp((viewport.scrollTop / canvasHeight) * MINIMAP_HEIGHT, 0, MINIMAP_HEIGHT - miniViewportHeight);
 
   useEffect(() => {
     nodesRef.current = nodes;
   }, [nodes]);
+
+  useEffect(() => {
+    const surface = canvasSurfaceRef.current;
+
+    if (!surface) {
+      return;
+    }
+
+    function updateViewport() {
+      setViewport({
+        scrollLeft: surface.scrollLeft,
+        scrollTop: surface.scrollTop,
+        width: surface.clientWidth,
+        height: surface.clientHeight,
+      });
+    }
+
+    updateViewport();
+    surface.addEventListener("scroll", updateViewport, { passive: true });
+    window.addEventListener("resize", updateViewport);
+
+    return () => {
+      surface.removeEventListener("scroll", updateViewport);
+      window.removeEventListener("resize", updateViewport);
+    };
+  }, [canvasWidth, canvasHeight]);
+
+  useEffect(() => {
+    const surface = canvasSurfaceRef.current;
+
+    if (!surface || !rootNode || initializedViewportRef.current) {
+      return;
+    }
+
+    surface.scrollTo({
+      left: Math.max(0, rootNode.position.x - Math.max(160, surface.clientWidth * 0.28)),
+      top: Math.max(0, rootNode.position.y - Math.max(120, surface.clientHeight * 0.22)),
+    });
+    initializedViewportRef.current = true;
+  }, [rootNode]);
 
   useEffect(() => {
     if (!dragState) {
@@ -61,6 +132,13 @@ export function CanvasWorkspace({ detail }: CanvasWorkspaceProps) {
     }
 
     const activeDragState = dragState;
+    const dragStartNode = nodesRef.current.find((node) => node.id === activeDragState.nodeId) ?? null;
+    const dragParentNode = dragStartNode?.parentNodeId
+      ? nodesRef.current.find((node) => node.id === dragStartNode.parentNodeId) ?? null
+      : null;
+    const minAllowedX = dragParentNode
+      ? dragParentNode.position.x + NODE_WIDTH + MIN_CHILD_X_GAP
+      : 60;
 
     function handlePointerMove(event: PointerEvent) {
       const pointer = getCanvasPointerPosition(event, canvasInnerRef.current);
@@ -75,7 +153,7 @@ export function CanvasWorkspace({ detail }: CanvasWorkspaceProps) {
             ? {
                 ...node,
                 position: {
-                  x: Math.max(60, pointer.x - activeDragState.offsetX),
+                  x: Math.max(minAllowedX, pointer.x - activeDragState.offsetX),
                   y: Math.max(80, pointer.y - activeDragState.offsetY),
                 },
               }
@@ -143,6 +221,28 @@ export function CanvasWorkspace({ detail }: CanvasWorkspaceProps) {
   }, [panState]);
 
   useEffect(() => {
+    if (!miniMapDragging) {
+      return;
+    }
+
+    function handlePointerMove(event: PointerEvent) {
+      scrollViewportFromMinimap(event.clientX, event.clientY, canvasSurfaceRef.current, miniMapFrameRef.current, canvasWidth, canvasHeight);
+    }
+
+    function handlePointerUp() {
+      setMiniMapDragging(false);
+    }
+
+    window.addEventListener("pointermove", handlePointerMove);
+    window.addEventListener("pointerup", handlePointerUp);
+
+    return () => {
+      window.removeEventListener("pointermove", handlePointerMove);
+      window.removeEventListener("pointerup", handlePointerUp);
+    };
+  }, [miniMapDragging, canvasWidth, canvasHeight]);
+
+  useEffect(() => {
     if (!copied) {
       return;
     }
@@ -174,7 +274,13 @@ export function CanvasWorkspace({ detail }: CanvasWorkspaceProps) {
   }
 
   function handleCanvasPointerDown(event: ReactPointerEvent<HTMLDivElement>) {
-    if (event.target !== event.currentTarget) {
+    if (event.button !== 0) {
+      return;
+    }
+
+    const target = event.target as HTMLElement;
+
+    if (target.closest("[data-no-pan='true']")) {
       return;
     }
 
@@ -193,6 +299,21 @@ export function CanvasWorkspace({ detail }: CanvasWorkspaceProps) {
     });
   }
 
+  function handleMiniMapPointerDown(event: ReactPointerEvent<HTMLDivElement>) {
+    event.preventDefault();
+    event.stopPropagation();
+
+    scrollViewportFromMinimap(
+      event.clientX,
+      event.clientY,
+      canvasSurfaceRef.current,
+      miniMapFrameRef.current,
+      canvasWidth,
+      canvasHeight,
+    );
+    setMiniMapDragging(true);
+  }
+
   function handlePointerDown(node: CanvasWorkspaceNode, event: ReactPointerEvent<HTMLButtonElement>) {
     if (viewerMode !== "authenticated") {
       return;
@@ -204,6 +325,7 @@ export function CanvasWorkspace({ detail }: CanvasWorkspaceProps) {
       return;
     }
 
+    event.stopPropagation();
     event.currentTarget.setPointerCapture(event.pointerId);
     setSelectedNodeId(node.id);
     setWriteOpen(false);
@@ -281,43 +403,27 @@ export function CanvasWorkspace({ detail }: CanvasWorkspaceProps) {
   return (
     <main className={styles.page}>
       <section className={styles.workspace}>
-        <header className={styles.topBar}>
-          <div className={styles.titleBlock}>
-            <span className={styles.eyebrow}>Role 2 canvas workspace</span>
-            <h1 className={styles.title}>{detail.canvas.title}</h1>
-            <p className={styles.subtitle}>
-              Share key: {detail.canvas.shareKey} · Max branch depth: {detail.canvas.maxUserNodesPerBranch}
-            </p>
-          </div>
-          <div className={styles.actions}>
-            <button className={styles.pill} onClick={handleCopyLink} type="button">
-              {copied ? "Link copied" : "Copy link"}
-            </button>
-            {readHref ? (
-              <a className={styles.primaryPill} href={readHref}>
-                Read branch
-              </a>
-            ) : (
-              <span className={styles.statusPill}>Select an ending node to read</span>
-            )}
-            <span className={styles.statusPill}>
-              {viewerMode === "authenticated"
-                ? `Logged in as ${detail.viewer?.nickname ?? "writer"}`
-                : "Guest mode: read only, login to write"}
-            </span>
-          </div>
-        </header>
-
         <div
           className={`${styles.canvasSurface} ${panState ? styles.canvasSurfacePanning : ""}`}
           ref={canvasSurfaceRef}
+          onPointerDown={handleCanvasPointerDown}
         >
           <div
             className={styles.canvasInner}
             ref={canvasInnerRef}
-            onPointerDown={handleCanvasPointerDown}
             style={{ width: canvasWidth, height: canvasHeight }}
           >
+            {forbiddenBoundaryX ? (
+              <div
+                className={styles.constraintZone}
+                style={{ width: forbiddenBoundaryX }}
+              >
+                <div className={styles.constraintLabel}>
+                  이전 노드보다 왼쪽으로 배치할 수 없는 영역
+                </div>
+              </div>
+            ) : null}
+
             <svg className={styles.edgeLayer}>
               {nodes
                 .filter((node) => node.parentNodeId)
@@ -357,6 +463,7 @@ export function CanvasWorkspace({ detail }: CanvasWorkspaceProps) {
                     left: node.position.x,
                     top: node.position.y,
                   }}
+                  data-no-pan="true"
                   type="button"
                 >
                   <span className={styles.nodeType}>{typeLabel}</span>
@@ -369,7 +476,7 @@ export function CanvasWorkspace({ detail }: CanvasWorkspaceProps) {
         </div>
 
         <aside className={styles.drawer}>
-          <div className={styles.drawerContent}>
+          <div className={styles.drawerContent} data-no-pan="true">
             <span className={styles.sectionLabel}>Selected node</span>
             <h2 className={styles.drawerTitle}>{getNodeHeading(selectedNode)}</h2>
             <div className={styles.metaRow}>
@@ -470,8 +577,18 @@ export function CanvasWorkspace({ detail }: CanvasWorkspaceProps) {
         </aside>
 
         <section className={styles.miniMap}>
-          <h2 className={styles.miniMapTitle}>Mini map</h2>
-          <div className={styles.miniMapFrame}>
+          <div className={styles.miniMapChrome} data-no-pan="true">
+            <h2 className={styles.miniMapTitle}>Mini map</h2>
+            <p className={styles.miniCaption}>
+              클릭하거나 드래그해서 뷰포트를 이동하세요.
+            </p>
+          </div>
+          <div
+            className={styles.miniMapFrame}
+            data-no-pan="true"
+            onPointerDown={handleMiniMapPointerDown}
+            ref={miniMapFrameRef}
+          >
             {nodes.map((node) => (
               <div
                 key={`mini-${node.id}`}
@@ -482,13 +599,63 @@ export function CanvasWorkspace({ detail }: CanvasWorkspaceProps) {
                 }}
               />
             ))}
-            <div className={styles.miniViewport} style={{ left: 18, top: 16, width: 82, height: 48 }} />
+            <div
+              className={styles.miniViewport}
+              style={{
+                left: 10 + miniViewportLeft,
+                top: 8 + miniViewportTop,
+                width: miniViewportWidth,
+                height: miniViewportHeight,
+              }}
+            />
           </div>
-          <p className={styles.miniCaption}>
-            Bottom-left translucent overlay, kept inside the canvas instead of taking a permanent
-            sidebar.
-          </p>
         </section>
+
+        <div className={styles.controlDock} data-no-pan="true">
+          {controlsOpen ? (
+            <div className={styles.controlPanel}>
+              <div className={styles.controlHeader}>
+                <div>
+                  <span className={styles.sectionLabel}>Canvas menu</span>
+                  <h2 className={styles.controlTitle}>{detail.canvas.title}</h2>
+                </div>
+                <button
+                  className={styles.controlToggle}
+                  onClick={() => setControlsOpen(false)}
+                  type="button"
+                >
+                  Close
+                </button>
+              </div>
+
+              <div className={styles.controlActions}>
+                <button className={styles.pill} onClick={handleCopyLink} type="button">
+                  {copied ? "Link copied" : "Copy share link"}
+                </button>
+                {readHref ? (
+                  <a className={styles.primaryPill} href={readHref}>
+                    Read branch
+                  </a>
+                ) : (
+                  <span className={styles.statusPill}>결말 노드를 선택하면 읽기 가능</span>
+                )}
+                <span className={styles.statusPill}>
+                  {viewerMode === "authenticated"
+                    ? `Logged in as ${detail.viewer?.nickname ?? "writer"}`
+                    : "Guest mode: read only"}
+                </span>
+              </div>
+            </div>
+          ) : null}
+
+          <button
+            className={styles.controlDockButton}
+            onClick={() => setControlsOpen((current) => !current)}
+            type="button"
+          >
+            {controlsOpen ? "Hide canvas menu" : "Open canvas menu"}
+          </button>
+        </div>
       </section>
     </main>
   );
@@ -544,4 +711,32 @@ function getNodeTypeLabel(node: CanvasWorkspaceNode) {
 
 function getExcerpt(content: string) {
   return content.length > 96 ? `${content.slice(0, 96)}...` : content;
+}
+
+function scrollViewportFromMinimap(
+  clientX: number,
+  clientY: number,
+  surface: HTMLDivElement | null,
+  frame: HTMLDivElement | null,
+  canvasWidth: number,
+  canvasHeight: number,
+) {
+  if (!surface || !frame) {
+    return;
+  }
+
+  const rect = frame.getBoundingClientRect();
+  const localX = clamp(clientX - rect.left - 10, 0, MINIMAP_WIDTH);
+  const localY = clamp(clientY - rect.top - 8, 0, MINIMAP_HEIGHT);
+  const targetLeft = (localX / MINIMAP_WIDTH) * canvasWidth - surface.clientWidth / 2;
+  const targetTop = (localY / MINIMAP_HEIGHT) * canvasHeight - surface.clientHeight / 2;
+
+  surface.scrollTo({
+    left: clamp(targetLeft, 0, Math.max(0, canvasWidth - surface.clientWidth)),
+    top: clamp(targetTop, 0, Math.max(0, canvasHeight - surface.clientHeight)),
+  });
+}
+
+function clamp(value: number, min: number, max: number) {
+  return Math.min(Math.max(value, min), max);
 }
