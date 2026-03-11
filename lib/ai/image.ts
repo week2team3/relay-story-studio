@@ -190,14 +190,14 @@ async function persistGeneratedAsset(input: PreparedImageInput, mimeType: string
   const assetId = new Types.ObjectId();
   const extension = getExtensionForMimeType(mimeType);
   const fileName = `${assetId.toString()}${extension}`;
-  await writeStoredAsset(fileName, bytes);
+  const url = await writeStoredAsset(fileName, mimeType, bytes);
 
   const asset = await AssetModel.create({
     _id: assetId,
     canvasId: input.canvasId,
     nodeId: null,
     type: "generated-image",
-    url: `/api/assets/file/${fileName}`,
+    url,
     prompt: input.prompt,
     createdBy: input.createdBy
   });

@@ -1,5 +1,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import { put } from "@vercel/blob";
 import { badRequest, notFound } from "@/lib/server/errors";
 
 const STORAGE_ROOT = path.join(process.cwd(), "storage", "assets");
@@ -57,10 +58,26 @@ export async function ensureAssetStorageRoot() {
   await fs.mkdir(STORAGE_ROOT, { recursive: true });
 }
 
-export async function writeStoredAsset(fileName: string, bytes: Buffer) {
+function shouldUseBlobStorage() {
+  return (process.env.BLOB_READ_WRITE_TOKEN?.trim() ?? "").length > 0;
+}
+
+export async function writeStoredAsset(fileName: string, mimeType: string, bytes: Buffer) {
   const safeFileName = assertSafeFileName(fileName);
+
+  if (shouldUseBlobStorage()) {
+    const blob = await put(safeFileName, bytes, {
+      access: "public",
+      addRandomSuffix: false,
+      contentType: mimeType
+    });
+
+    return blob.url;
+  }
+
   await ensureAssetStorageRoot();
   await fs.writeFile(path.join(STORAGE_ROOT, safeFileName), bytes);
+  return `/api/assets/file/${safeFileName}`;
 }
 
 export async function readStoredAsset(fileName: string) {

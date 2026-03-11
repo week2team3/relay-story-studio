@@ -654,6 +654,7 @@ export function CanvasWorkspace({ detail }: CanvasWorkspaceProps) {
               <div className={styles.drawerAssetGrid}>
                 {selectedNodeAssets.map((asset, index) => (
                   <figure className={styles.drawerAssetCard} key={asset.id}>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       alt={asset.prompt?.trim() || `Node attachment ${index + 1}`}
                       className={styles.drawerAssetImage}
