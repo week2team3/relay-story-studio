@@ -104,6 +104,24 @@ function buildSummaryContext(nodes: Array<{ title?: string | null; content: stri
     .join("\n\n");
 }
 
+function buildInlineSummaryText(nodes: Array<{ title?: string | null; content: string }>) {
+  const snippets = nodes
+    .map((node, index) => {
+      const title = node.title?.trim();
+      const cleanedContent = node.content.replace(/\s+/g, " ").trim();
+      const excerpt = cleanedContent.length > 140 ? `${cleanedContent.slice(0, 137).trimEnd()}...` : cleanedContent;
+
+      if (title) {
+        return `Node ${index + 1} (${title}): ${excerpt}`;
+      }
+
+      return `Node ${index + 1}: ${excerpt}`;
+    })
+    .filter(Boolean);
+
+  return snippets.join("\n");
+}
+
 function extractOutputText(payload: OpenAiResponsesPayload) {
   const direct = payload.output_text?.trim();
 
@@ -222,11 +240,25 @@ export async function getSummaryForBranch(input: SummaryRequest): Promise<Summar
     hiddenByDefault: true as const
   };
 
-  if (sourceNodeCount < MIN_CONTEXT_NODES && sourceCharCount < MIN_CONTEXT_CHARACTERS) {
+  if (sourceNodeCount === 0) {
     return {
       status: "not_needed",
       source: null,
       summary: null,
+      meta
+    };
+  }
+
+  if (sourceNodeCount < MIN_CONTEXT_NODES && sourceCharCount < MIN_CONTEXT_CHARACTERS) {
+    return {
+      status: "ready",
+      source: "inline",
+      summary: buildInlineSummarySnapshot({
+        canvasId: canvasId.toString(),
+        baseNodeId: baseNodeId.toString(),
+        summaryText: buildInlineSummaryText(orderedSourceNodes),
+        sourceNodeIds: orderedSourceNodeIds
+      }),
       meta
     };
   }
@@ -252,7 +284,26 @@ export async function getSummaryForBranch(input: SummaryRequest): Promise<Summar
     console.warn("Summary cache lookup failed, continuing with live generation.", error);
   }
 
-  const summaryText = await generateOpenAiSummary(orderedSourceNodes);
+  let summaryText: string;
+
+  try {
+    summaryText = await generateOpenAiSummary(orderedSourceNodes);
+  } catch (error) {
+    console.warn("OpenAI summary generation failed, falling back to inline summary.", error);
+
+    return {
+      status: "ready",
+      source: "inline",
+      summary: buildInlineSummarySnapshot({
+        canvasId: canvasId.toString(),
+        baseNodeId: baseNodeId.toString(),
+        summaryText: buildInlineSummaryText(orderedSourceNodes),
+        sourceNodeIds: orderedSourceNodeIds
+      }),
+      meta
+    };
+  }
+
   try {
     const savedSummary = await SummaryModel.findOneAndUpdate(
       { canvasId, baseNodeId },
@@ -284,7 +335,7 @@ export async function getSummaryForBranch(input: SummaryRequest): Promise<Summar
 
   return {
     status: "ready",
-    source: "openai",
+    source: "inline",
     summary: buildInlineSummarySnapshot({
       canvasId: canvasId.toString(),
       baseNodeId: baseNodeId.toString(),
