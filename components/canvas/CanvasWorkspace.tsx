@@ -3,7 +3,7 @@
 import { type PointerEvent as ReactPointerEvent, useEffect, useRef, useState } from "react";
 import { MediaPicker } from "@/components/media/MediaPicker";
 import type { MediaAsset } from "@/lib/media/types";
-import { createCanvasNode, persistNodePosition } from "./canvasApi";
+import { createCanvasNode, fetchCanvasWorkspace, persistNodePosition } from "./canvasApi";
 import styles from "./CanvasWorkspace.module.css";
 import { CanvasWorkspaceData, CanvasWorkspaceNode } from "./types";
 
@@ -24,6 +24,7 @@ const WORLD_PADDING_TOP = 620;
 const WORLD_PADDING_BOTTOM = 960;
 const WORLD_MIN_WIDTH = 5200;
 const WORLD_MIN_HEIGHT = 3200;
+const LIVE_SYNC_INTERVAL_MS = 2000;
 
 type CanvasWorkspaceProps = {
   detail: CanvasWorkspaceData;
@@ -65,6 +66,7 @@ export function CanvasWorkspace({ detail }: CanvasWorkspaceProps) {
   const [controlsOpen, setControlsOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLiveSyncing, setIsLiveSyncing] = useState(true);
   const [submitMessage, setSubmitMessage] = useState<string | null>(null);
   const [viewport, setViewport] = useState<ViewportState>({
     scrollLeft: 0,
@@ -77,6 +79,7 @@ export function CanvasWorkspace({ detail }: CanvasWorkspaceProps) {
   const canvasInnerRef = useRef<HTMLDivElement | null>(null);
   const miniMapFrameRef = useRef<HTMLDivElement | null>(null);
   const initializedViewportRef = useRef(false);
+  const syncSignatureRef = useRef(buildCanvasSyncSignature(detail));
 
   const selectedNode = nodes.find((node) => node.id === selectedNodeId) ?? nodes[0];
   const selectedNodeAssets = selectedNode
@@ -147,6 +150,71 @@ export function CanvasWorkspace({ detail }: CanvasWorkspaceProps) {
   useEffect(() => {
     nodesRef.current = nodes;
   }, [nodes]);
+
+  useEffect(() => {
+    syncSignatureRef.current = buildCanvasSyncSignature({
+      ...detail,
+      nodes,
+      assets,
+    });
+  }, [assets, detail, nodes]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function syncWorkspace() {
+      if (cancelled) {
+        return;
+      }
+
+      if (typeof document !== "undefined" && document.visibilityState === "hidden") {
+        return;
+      }
+
+      if (dragState || panState || miniMapDragging || isSubmitting) {
+        return;
+      }
+
+      try {
+        const latestDetail = await fetchCanvasWorkspace(detail.canvas.shareKey);
+
+        if (cancelled) {
+          return;
+        }
+
+        const nextSignature = buildCanvasSyncSignature(latestDetail);
+
+        if (nextSignature === syncSignatureRef.current) {
+          setIsLiveSyncing(true);
+          return;
+        }
+
+        setNodes(latestDetail.nodes);
+        setAssets(latestDetail.assets);
+        setSelectedNodeId((currentSelectedNodeId) =>
+          latestDetail.nodes.some((node) => node.id === currentSelectedNodeId)
+            ? currentSelectedNodeId
+            : latestDetail.nodes[0]?.id ?? "",
+        );
+        syncSignatureRef.current = nextSignature;
+        setIsLiveSyncing(true);
+      } catch {
+        if (!cancelled) {
+          setIsLiveSyncing(false);
+        }
+      }
+    }
+
+    void syncWorkspace();
+    const interval = window.setInterval(() => {
+      void syncWorkspace();
+    }, LIVE_SYNC_INTERVAL_MS);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, [detail, dragState, isSubmitting, miniMapDragging, panState]);
 
   useEffect(() => {
     const surface = canvasSurfaceRef.current;
@@ -655,6 +723,9 @@ export function CanvasWorkspace({ detail }: CanvasWorkspaceProps) {
             <div className={styles.metaRow}>
               {getNodeTypeLabel(selectedNode)} · {formatNodeTimestamp(selectedNode.createdAt)}
             </div>
+            <div className={styles.metaRow}>
+              {isLiveSyncing ? "실시간 동기화 중" : "실시간 동기화 재시도 중"}
+            </div>
             {selectedNodeAssets.length > 0 ? (
               <div className={styles.drawerAssetGrid}>
                 {selectedNodeAssets.map((asset, index) => (
@@ -1023,4 +1094,15 @@ function scrollViewportFromMinimap(
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
+}
+
+function buildCanvasSyncSignature(detail: CanvasWorkspaceData) {
+  const nodeSignature = detail.nodes
+    .map((node) => `${node.id}:${node.updatedAt}:${node.position.x}:${node.position.y}`)
+    .join("|");
+  const assetSignature = detail.assets
+    .map((asset) => `${asset.id}:${asset.updatedAt}:${asset.nodeId ?? ""}`)
+    .join("|");
+
+  return `${detail.canvas.updatedAt}::${nodeSignature}::${assetSignature}`;
 }

@@ -1,4 +1,10 @@
-import { CreateCanvasNodeInput, CreateCanvasNodeResult, CanvasPositionPayload, PersistNodePositionResult } from "./types";
+import {
+  CreateCanvasNodeInput,
+  CreateCanvasNodeResult,
+  CanvasPositionPayload,
+  CanvasWorkspaceData,
+  PersistNodePositionResult
+} from "./types";
 
 async function readApiError(response: Response) {
   try {
@@ -39,4 +45,19 @@ export async function createCanvasNode(input: CreateCanvasNodeInput) {
   }
 
   return (await response.json()) as CreateCanvasNodeResult;
+}
+
+export async function fetchCanvasWorkspace(shareKey: string) {
+  const response = await fetch(`/api/canvases/${shareKey}`, {
+    cache: "no-store",
+    headers: {
+      "Content-Type": "application/json",
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(await readApiError(response));
+  }
+
+  return (await response.json()) as CanvasWorkspaceData;
 }
