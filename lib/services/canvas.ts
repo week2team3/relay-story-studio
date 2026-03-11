@@ -70,10 +70,12 @@ function assertImageAssetIds(imageAssetIds?: string[]) {
   return ids.map((id) => toObjectId(id, "imageAssetIds[]"));
 }
 
-async function generateUniqueShareKey(session: ClientSession) {
+async function generateUniqueShareKey(session: ClientSession | null) {
   for (let attempt = 0; attempt < 8; attempt += 1) {
     const shareKey = generateShareKey();
-    const existingCanvas = await CanvasModel.exists({ shareKey }).session(session);
+    const existingCanvas = session
+      ? await CanvasModel.exists({ shareKey }).session(session)
+      : await CanvasModel.exists({ shareKey });
 
     if (!existingCanvas) {
       return shareKey;
@@ -113,7 +115,7 @@ async function createAutoEndingNode(
   position: NodePosition,
   createdBy: Types.ObjectId,
   userNodeCountInPath: number,
-  session: ClientSession
+  session: ClientSession | null
 ) {
   const [autoEndingNode] = await NodeModel.create(
     [
@@ -132,7 +134,7 @@ async function createAutoEndingNode(
         createdBy
       }
     ],
-    { session }
+    session ? { session } : undefined
   );
 
   return autoEndingNode;
@@ -164,7 +166,7 @@ export async function createCanvasWithRoot(
           shareKey
         }
       ],
-      { session }
+      session ? { session } : undefined
     );
 
     const [rootNode] = await NodeModel.create(
@@ -185,7 +187,7 @@ export async function createCanvasWithRoot(
           createdBy: creatorId
         }
       ],
-      { session }
+      session ? { session } : undefined
     );
 
     await ParticipationModel.create(
@@ -197,7 +199,7 @@ export async function createCanvasWithRoot(
           lastContributedAt: new Date()
         }
       ],
-      { session }
+      session ? { session } : undefined
     );
 
     let autoEndingNode = null;
@@ -298,13 +300,17 @@ export async function createNode(
   const isEnding = Boolean(input.isEnding);
 
   const result = await withTransaction(async (session) => {
-    const canvas = await CanvasModel.findById(canvasId).session(session);
+    const canvas = session
+      ? await CanvasModel.findById(canvasId).session(session)
+      : await CanvasModel.findById(canvasId);
 
     if (!canvas) {
       throw notFound("Canvas not found.");
     }
 
-    const parentNode = await NodeModel.findById(parentNodeId).session(session);
+    const parentNode = session
+      ? await NodeModel.findById(parentNodeId).session(session)
+      : await NodeModel.findById(parentNodeId);
 
     if (!parentNode || parentNode.canvasId.toString() !== canvas._id.toString()) {
       throw badRequest("Parent node must exist inside the requested canvas.");
@@ -337,7 +343,7 @@ export async function createNode(
           createdBy
         }
       ],
-      { session }
+      session ? { session } : undefined
     );
 
     await ParticipationModel.updateOne(
@@ -351,7 +357,7 @@ export async function createNode(
           createdAt: new Date()
         }
       },
-      { upsert: true, session }
+      session ? { upsert: true, session } : { upsert: true }
     );
 
     let autoEndingNode = null;
