@@ -23,7 +23,7 @@ function validateNickname(nickname: string) {
 
 export async function signupUser(input: SignupRequest) {
   const email = normalizeEmail(input.email);
-  const nickname = input.nickname.trim();
+  const nickname = (input.nickname ?? input.name ?? "").trim();
   const password = input.password;
 
   if (!validateEmail(email)) {

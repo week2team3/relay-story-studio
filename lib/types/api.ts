@@ -11,7 +11,8 @@ import type {
 export type SignupRequest = {
   email: string;
   password: string;
-  nickname: string;
+  nickname?: string;
+  name?: string;
 };
 
 export type LoginRequest = {
