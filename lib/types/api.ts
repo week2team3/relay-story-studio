@@ -71,3 +71,14 @@ export type UpdateNodePositionResponse = {
 export type ReaderBranchResponse = {
   branch: ReaderBranchContent;
 };
+
+export type CollaboratorPresence = {
+  userId: string;
+  nickname: string;
+  lastSeenAt: string;
+  isCurrentUser: boolean;
+};
+
+export type CanvasPresenceResponse = {
+  collaborators: CollaboratorPresence[];
+};

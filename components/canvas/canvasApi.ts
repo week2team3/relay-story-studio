@@ -1,4 +1,5 @@
 import {
+  CanvasPresenceResult,
   CreateCanvasNodeInput,
   CreateCanvasNodeResult,
   CanvasPositionPayload,
@@ -60,4 +61,23 @@ export async function fetchCanvasWorkspace(shareKey: string) {
   }
 
   return (await response.json()) as CanvasWorkspaceData;
+}
+
+export async function heartbeatCanvasPresence(shareKey: string) {
+  await fetch(`/api/canvases/${shareKey}/presence`, {
+    method: "POST",
+    cache: "no-store"
+  });
+}
+
+export async function fetchCanvasPresence(shareKey: string) {
+  const response = await fetch(`/api/canvases/${shareKey}/presence`, {
+    cache: "no-store"
+  });
+
+  if (!response.ok) {
+    throw new Error(await readApiError(response));
+  }
+
+  return (await response.json()) as CanvasPresenceResult;
 }

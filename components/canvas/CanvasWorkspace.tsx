@@ -3,7 +3,13 @@
 import { type PointerEvent as ReactPointerEvent, useEffect, useRef, useState } from "react";
 import { MediaPicker } from "@/components/media/MediaPicker";
 import type { MediaAsset } from "@/lib/media/types";
-import { createCanvasNode, fetchCanvasWorkspace, persistNodePosition } from "./canvasApi";
+import {
+  createCanvasNode,
+  fetchCanvasPresence,
+  fetchCanvasWorkspace,
+  heartbeatCanvasPresence,
+  persistNodePosition
+} from "./canvasApi";
 import styles from "./CanvasWorkspace.module.css";
 import { CanvasWorkspaceData, CanvasWorkspaceNode } from "./types";
 
@@ -24,7 +30,8 @@ const WORLD_PADDING_TOP = 620;
 const WORLD_PADDING_BOTTOM = 960;
 const WORLD_MIN_WIDTH = 5200;
 const WORLD_MIN_HEIGHT = 3200;
-const LIVE_SYNC_INTERVAL_MS = 2000;
+const LIVE_SYNC_INTERVAL_MS = 1200;
+const PRESENCE_SYNC_INTERVAL_MS = 5000;
 
 type CanvasWorkspaceProps = {
   detail: CanvasWorkspaceData;
@@ -67,6 +74,11 @@ export function CanvasWorkspace({ detail }: CanvasWorkspaceProps) {
   const [copied, setCopied] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLiveSyncing, setIsLiveSyncing] = useState(true);
+  const [collaborators, setCollaborators] = useState<Array<{
+    userId: string;
+    nickname: string;
+    isCurrentUser: boolean;
+  }>>([]);
   const [submitMessage, setSubmitMessage] = useState<string | null>(null);
   const [viewport, setViewport] = useState<ViewportState>({
     scrollLeft: 0,
@@ -215,6 +227,44 @@ export function CanvasWorkspace({ detail }: CanvasWorkspaceProps) {
       window.clearInterval(interval);
     };
   }, [detail, dragState, isSubmitting, miniMapDragging, panState]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function syncPresence() {
+      try {
+        if (viewerMode === "authenticated") {
+          await heartbeatCanvasPresence(detail.canvas.shareKey);
+        }
+
+        const result = await fetchCanvasPresence(detail.canvas.shareKey);
+
+        if (!cancelled) {
+          setCollaborators(
+            result.collaborators.map((collaborator) => ({
+              userId: collaborator.userId,
+              nickname: collaborator.nickname,
+              isCurrentUser: collaborator.isCurrentUser
+            }))
+          );
+        }
+      } catch {
+        if (!cancelled) {
+          setCollaborators([]);
+        }
+      }
+    }
+
+    void syncPresence();
+    const interval = window.setInterval(() => {
+      void syncPresence();
+    }, PRESENCE_SYNC_INTERVAL_MS);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, [detail.canvas.shareKey, viewerMode]);
 
   useEffect(() => {
     const surface = canvasSurfaceRef.current;
@@ -726,6 +776,15 @@ export function CanvasWorkspace({ detail }: CanvasWorkspaceProps) {
             <div className={styles.metaRow}>
               {isLiveSyncing ? "실시간 동기화 중" : "실시간 동기화 재시도 중"}
             </div>
+            {collaborators.length > 0 ? (
+              <div className={styles.collaboratorList}>
+                {collaborators.map((collaborator) => (
+                  <span className={styles.collaboratorChip} key={collaborator.userId}>
+                    {collaborator.isCurrentUser ? `${collaborator.nickname} (나)` : collaborator.nickname}
+                  </span>
+                ))}
+              </div>
+            ) : null}
             {selectedNodeAssets.length > 0 ? (
               <div className={styles.drawerAssetGrid}>
                 {selectedNodeAssets.map((asset, index) => (

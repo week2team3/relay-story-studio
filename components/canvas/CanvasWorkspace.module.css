@@ -257,6 +257,24 @@
   font-size: 13px;
 }
 
+.collaboratorList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.collaboratorChip {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(23, 92, 211, 0.1);
+  color: #175cd3;
+  font-size: 12px;
+  font-weight: 700;
+}
+
 .drawerAssetGrid {
   display: grid;
   gap: 10px;
