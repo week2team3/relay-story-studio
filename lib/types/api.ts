@@ -47,6 +47,7 @@ export type CanvasDetailResponse = CanvasDetail;
 export type CreateNodeRequest = {
   canvasId: string;
   parentNodeId: string;
+  title: string;
   content: string;
   position: NodePosition;
   imageAssetIds?: string[];

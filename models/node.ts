@@ -8,6 +8,7 @@ export type NodeDocument = {
   ancestorIds: Types.ObjectId[];
   depth: number;
   userNodeCountInPath: number;
+  title: string | null;
   content: string;
   isEnding: boolean;
   endingType: EndingType;
@@ -49,6 +50,10 @@ const nodeSchema = new Schema<NodeDocument>(
       type: Number,
       required: true,
       min: 1
+    },
+    title: {
+      type: String,
+      default: null
     },
     content: {
       type: String,

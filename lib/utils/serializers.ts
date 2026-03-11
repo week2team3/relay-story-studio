@@ -49,6 +49,7 @@ export function serializeNode(node: NodeDocument): Node {
     ancestorIds: node.ancestorIds.map((ancestorId) => ancestorId.toString()),
     depth: node.depth,
     userNodeCountInPath: node.userNodeCountInPath,
+    title: node.title ?? null,
     content: node.content,
     isEnding: node.isEnding,
     endingType: node.endingType,

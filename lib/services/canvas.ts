@@ -20,6 +20,7 @@ import { AssetModel, CanvasModel, NodeModel, ParticipationModel } from "@/models
 const DEFAULT_MAX_USER_NODES = 12;
 const MAX_ALLOWED_USER_NODES = 50;
 const AUTO_ENDING_COPY = "This branch has reached the relay limit and closes here.";
+const MAX_NODE_IMAGE_ASSETS = 1;
 
 function assertTitle(title: string) {
   const value = title.trim();
@@ -36,6 +37,16 @@ function assertContent(content: string) {
 
   if (value.length < 1 || value.length > 4000) {
     throw badRequest("Content must be between 1 and 4000 characters.");
+  }
+
+  return value;
+}
+
+function assertNodeTitle(title: string) {
+  const value = title.trim();
+
+  if (value.length < 1 || value.length > 60) {
+    throw badRequest("Node title must be between 1 and 60 characters.");
   }
 
   return value;
@@ -66,6 +77,10 @@ function assertImageAssetIds(imageAssetIds?: string[]) {
 
   if (!Array.isArray(ids)) {
     throw badRequest("imageAssetIds must be an array of ObjectId strings.");
+  }
+
+  if (ids.length > MAX_NODE_IMAGE_ASSETS) {
+    throw badRequest(`You can attach up to ${MAX_NODE_IMAGE_ASSETS} image per node.`);
   }
 
   return ids.map((id) => toObjectId(id, "imageAssetIds[]"));
@@ -186,6 +201,7 @@ async function createAutoEndingNode(
         ancestorIds,
         depth,
         userNodeCountInPath,
+        title: "Auto ending",
         content: AUTO_ENDING_COPY,
         isEnding: true,
         endingType: "auto-max-depth",
@@ -239,6 +255,7 @@ export async function createCanvasWithRoot(
           ancestorIds: [],
           depth: 0,
           userNodeCountInPath: 1,
+          title: null,
           content: rootContent,
           isEnding: false,
           endingType: null,
@@ -367,6 +384,7 @@ export async function createNode(
 ): Promise<CreateNodeResponse> {
   const canvasId = toObjectId(input.canvasId, "canvasId");
   const parentNodeId = toObjectId(input.parentNodeId, "parentNodeId");
+  const title = assertNodeTitle(input.title);
   const content = assertContent(input.content);
   const position = assertPosition(input.position);
   const imageAssetIds = assertImageAssetIds(input.imageAssetIds);
@@ -410,6 +428,7 @@ export async function createNode(
           ancestorIds: [...parentNode.ancestorIds, parentNode._id],
           depth: parentNode.depth + 1,
           userNodeCountInPath: nextUserNodeCount,
+          title,
           content,
           isEnding,
           endingType: isEnding ? "manual" : null,
@@ -501,5 +520,4 @@ export async function updateNodePosition(
     node: serializeNode(node)
   };
 }
-
 

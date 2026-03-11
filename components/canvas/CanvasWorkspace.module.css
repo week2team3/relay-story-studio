@@ -549,6 +549,7 @@
 
 .contextBox,
 .summaryBox,
+.composerTitleInput,
 .composerTextarea {
   width: 100%;
   border: 1px solid var(--line);
@@ -587,6 +588,13 @@
   font-size: 14px;
   line-height: 1.7;
   background: rgba(251, 244, 236, 0.98);
+}
+
+.composerTitleInput {
+  padding: 16px 18px;
+  color: var(--ink);
+  font-size: 15px;
+  line-height: 1.4;
 }
 
 .composerTextarea {

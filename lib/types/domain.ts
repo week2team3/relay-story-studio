@@ -27,6 +27,7 @@ export type Node = {
   ancestorIds: string[];
   depth: number;
   userNodeCountInPath: number;
+  title: string | null;
   content: string;
   isEnding: boolean;
   endingType: EndingType;

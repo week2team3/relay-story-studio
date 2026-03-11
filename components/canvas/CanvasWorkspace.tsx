@@ -15,6 +15,7 @@ const MINIMAP_HEIGHT = 152;
 const MINIMAP_PADDING_X = 14;
 const MINIMAP_PADDING_Y = 14;
 const MIN_CHILD_X_GAP = 36;
+const VERTICAL_DRAG_FACTOR = 0.58;
 const WORLD_PADDING_LEFT = 960;
 const WORLD_PADDING_RIGHT = 1560;
 const WORLD_PADDING_TOP = 620;
@@ -51,6 +52,7 @@ export function CanvasWorkspace({ detail }: CanvasWorkspaceProps) {
   const [assets, setAssets] = useState(detail.assets);
   const [selectedNodeId, setSelectedNodeId] = useState(detail.nodes[0]?.id ?? "");
   const [writeOpen, setWriteOpen] = useState(false);
+  const [draftTitle, setDraftTitle] = useState("");
   const [draftText, setDraftText] = useState("");
   const [endingChecked, setEndingChecked] = useState(false);
   const [selectedAssets, setSelectedAssets] = useState<MediaAsset[]>([]);
@@ -203,14 +205,22 @@ export function CanvasWorkspace({ detail }: CanvasWorkspaceProps) {
       event.preventDefault();
       setNodes((currentNodes) =>
         currentNodes.map((node) =>
-          node.id === activeDragState.nodeId
-            ? {
-                ...node,
-                position: {
-                  x: Math.max(minAllowedX, pointer.x - worldOffsetX - activeDragState.offsetX),
-                  y: Math.max(minAllowedY, pointer.y - worldOffsetY - activeDragState.offsetY),
-                },
-              }
+          node.id === activeDragState.nodeId && dragStartNode
+            ? (() => {
+                const desiredX = pointer.x - worldOffsetX - activeDragState.offsetX;
+                const desiredY = pointer.y - worldOffsetY - activeDragState.offsetY;
+                const easedY =
+                  dragStartNode.position.y +
+                  (desiredY - dragStartNode.position.y) * VERTICAL_DRAG_FACTOR;
+
+                return {
+                  ...node,
+                  position: {
+                    x: Math.max(minAllowedX, desiredX),
+                    y: Math.max(minAllowedY, easedY),
+                  },
+                };
+              })()
             : node,
         ),
       );
@@ -345,6 +355,7 @@ export function CanvasWorkspace({ detail }: CanvasWorkspaceProps) {
   }
 
   function clearDraftState() {
+    setDraftTitle("");
     setDraftText("");
     setEndingChecked(false);
     setSelectedAssets([]);
@@ -450,6 +461,11 @@ export function CanvasWorkspace({ detail }: CanvasWorkspaceProps) {
       return;
     }
 
+    if (!draftTitle.trim()) {
+      setSubmitMessage("Add a node title before publishing.");
+      return;
+    }
+
     if (!draftText.trim()) {
       setSubmitMessage("Write the next node content before publishing.");
       return;
@@ -468,6 +484,7 @@ export function CanvasWorkspace({ detail }: CanvasWorkspaceProps) {
       const result = await createCanvasNode({
         canvasId: detail.canvas.id,
         parentNodeId: selectedNode.id,
+        title: draftTitle.trim(),
         content: draftText.trim(),
         position: nextPosition,
         imageAssetIds: selectedAssets.map((asset) => asset.id),
@@ -587,7 +604,7 @@ export function CanvasWorkspace({ detail }: CanvasWorkspaceProps) {
             <span className={styles.sectionLabel}>Selected node</span>
             <h2 className={styles.drawerTitle}>{getNodeHeading(selectedNode)}</h2>
             <div className={styles.metaRow}>
-              {getNodeTypeLabel(selectedNode)} · {selectedNode.createdAt}
+              {getNodeTypeLabel(selectedNode)} · {formatNodeTimestamp(selectedNode.createdAt)}
             </div>
             {selectedNodeAssets.length > 0 ? (
               <div className={styles.drawerAssetGrid}>
@@ -743,6 +760,18 @@ export function CanvasWorkspace({ detail }: CanvasWorkspaceProps) {
                 </aside>
 
                 <div className={styles.composerMain}>
+                  <label className={styles.fieldLabel} htmlFor="story-title">
+                    Node title
+                  </label>
+                  <input
+                    className={styles.composerTitleInput}
+                    id="story-title"
+                    maxLength={60}
+                    onChange={(event) => setDraftTitle(event.target.value)}
+                    placeholder="Give this branch node a title"
+                    value={draftTitle}
+                  />
+
                   <label className={styles.fieldLabel} htmlFor="story-draft">
                     Story content
                   </label>
@@ -758,6 +787,7 @@ export function CanvasWorkspace({ detail }: CanvasWorkspaceProps) {
                     baseNodeId={selectedNode.id}
                     canvasId={detail.canvas.id}
                     disabled={isSubmitting}
+                    maxAssets={1}
                     onChange={setSelectedAssets}
                     selectedAssets={selectedAssets}
                   />
@@ -823,6 +853,10 @@ function getNodeHeading(node: CanvasWorkspaceNode) {
     return "Root node";
   }
 
+  if (node.title?.trim()) {
+    return node.title.trim();
+  }
+
   if (node.isEnding && node.endingType === "auto-max-depth") {
     return "Auto ending";
   }
@@ -852,6 +886,22 @@ function getNodeTypeLabel(node: CanvasWorkspaceNode) {
 
 function getExcerpt(content: string) {
   return content.length > 96 ? `${content.slice(0, 96)}...` : content;
+}
+
+function formatNodeTimestamp(value: string) {
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return new Intl.DateTimeFormat("ko-KR", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(date);
 }
 
 function getContentBounds(nodes: CanvasWorkspaceNode[]) {
