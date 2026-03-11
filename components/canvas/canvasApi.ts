@@ -3,9 +3,9 @@ import { CreateCanvasNodeInput, CreateCanvasNodeResult, CanvasPositionPayload, P
 async function readApiError(response: Response) {
   try {
     const payload = (await response.json()) as { error?: string };
-    return payload.error ?? "Unexpected server error.";
+    return payload.error ?? "예상하지 못한 서버 오류가 발생했습니다.";
   } catch {
-    return "Unexpected server error.";
+    return "예상하지 못한 서버 오류가 발생했습니다.";
   }
 }
 

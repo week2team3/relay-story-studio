@@ -41,13 +41,13 @@ export function CreateCanvasForm() {
       const data = (await response.json()) as CreateCanvasResponse & { error?: string };
 
       if (!response.ok) {
-        setError(data.error ?? "Canvas creation failed.");
+        setError(data.error ?? "캔버스를 만들지 못했습니다.");
         setIsSubmitting(false);
         return;
       }
 
-      const autoEndingNote = data.autoEndingNode ? " Auto ending created immediately." : "";
-      setSuccess(`Canvas created with share key ${data.canvas.shareKey}.${autoEndingNote}`);
+      const autoEndingNote = data.autoEndingNode ? " 자동 엔딩 노드도 함께 생성되었습니다." : "";
+      setSuccess(`캔버스가 생성되었습니다.${autoEndingNote}`);
       form.reset();
       setIsSubmitting(false);
       router.push(`/canvas/${data.canvas.shareKey}`);
@@ -58,17 +58,17 @@ export function CreateCanvasForm() {
   return (
     <form className="stack" onSubmit={handleSubmit}>
       <div className="field">
-        <label htmlFor="title">Title</label>
+        <label htmlFor="title">제목</label>
         <input id="title" maxLength={80} minLength={3} name="title" type="text" required />
       </div>
 
       <div className="field">
-        <label htmlFor="rootContent">Opening node</label>
+        <label htmlFor="rootContent">시작 본문</label>
         <textarea id="rootContent" name="rootContent" required />
       </div>
 
       <div className="field">
-        <label htmlFor="maxUserNodesPerBranch">Max user nodes per branch</label>
+        <label htmlFor="maxUserNodesPerBranch">분기당 최대 작성 노드 수</label>
         <input
           defaultValue={12}
           id="maxUserNodesPerBranch"
@@ -84,7 +84,7 @@ export function CreateCanvasForm() {
       {success ? <p className="status-text status-success">{success}</p> : null}
 
       <button className="button-primary" disabled={isSubmitting} type="submit">
-        {isSubmitting ? "Creating..." : "Create canvas"}
+        {isSubmitting ? "생성 중..." : "캔버스 만들기"}
       </button>
     </form>
   );

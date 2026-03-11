@@ -22,9 +22,9 @@ type MediaPickerProps = {
 async function readApiError(response: Response) {
   try {
     const payload = (await response.json()) as { error?: string };
-    return payload.error ?? "Could not complete the media request.";
+    return payload.error ?? "이미지 요청을 처리하지 못했습니다.";
   } catch {
-    return "Could not complete the media request.";
+    return "이미지 요청을 처리하지 못했습니다.";
   }
 }
 
@@ -52,7 +52,7 @@ export function MediaPicker({
     }
 
     if (atLimit) {
-      setMessage(`You can attach up to ${maxAssets} images.`);
+      setMessage(`이미지는 최대 ${maxAssets}개까지 첨부할 수 있습니다.`);
       return;
     }
 
@@ -76,9 +76,9 @@ export function MediaPicker({
 
       const payload = (await response.json()) as UploadAssetResponse;
       onChange([...selectedAssets, payload.asset].slice(0, maxAssets));
-      setMessage("Image uploaded and attached to the draft.");
+      setMessage("이미지를 업로드했습니다.");
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Could not upload image.");
+      setMessage(error instanceof Error ? error.message : "이미지를 업로드하지 못했습니다.");
     } finally {
       setIsUploading(false);
     }
@@ -86,12 +86,12 @@ export function MediaPicker({
 
   async function handleGenerate() {
     if (!imagePrompt.trim()) {
-      setMessage("Write a prompt before generating an image.");
+      setMessage("이미지 설명을 입력해 주세요.");
       return;
     }
 
     if (atLimit) {
-      setMessage(`You can attach up to ${maxAssets} images.`);
+      setMessage(`이미지는 최대 ${maxAssets}개까지 첨부할 수 있습니다.`);
       return;
     }
 
@@ -122,11 +122,11 @@ export function MediaPicker({
       setImagePrompt("");
       setMessage(
         result.source === "openai"
-          ? "OpenAI image generated and attached to the draft."
-          : "Mock AI image generated and attached to the draft."
+          ? "AI 이미지를 생성했습니다."
+          : "미리보기 이미지를 생성했습니다."
       );
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Could not generate image.");
+      setMessage(error instanceof Error ? error.message : "이미지를 생성하지 못했습니다.");
     } finally {
       setIsGenerating(false);
     }
@@ -140,7 +140,7 @@ export function MediaPicker({
     <section className={styles.root}>
       <div className={styles.controls}>
         <label className={styles.uploadButton} htmlFor={inputId}>
-          {isUploading ? "Uploading..." : "Upload image"}
+          {isUploading ? "업로드 중..." : "이미지 업로드"}
         </label>
         <input
           accept="image/png,image/jpeg,image/webp,image/gif"
@@ -156,7 +156,7 @@ export function MediaPicker({
           onClick={handleGenerate}
           type="button"
         >
-          {isGenerating ? "Generating..." : "AI image"}
+          {isGenerating ? "생성 중..." : "AI 이미지"}
         </button>
       </div>
 
@@ -164,12 +164,12 @@ export function MediaPicker({
         className={styles.promptInput}
         disabled={disabled || isUploading || isGenerating || atLimit}
         onChange={(event) => setImagePrompt(event.target.value)}
-        placeholder="Describe the atmosphere, setting, or object you want to generate."
+        placeholder="생성하고 싶은 분위기나 장면을 입력하세요."
         value={imagePrompt}
       />
 
       <p className={styles.helperText}>
-        Attach up to {maxAssets} draft images. Uploaded and generated images use the same draft asset flow.
+        업로드 이미지와 AI 이미지를 합쳐 최대 {maxAssets}개까지 첨부할 수 있습니다.
       </p>
 
       {message ? <p className={styles.message}>{message}</p> : null}
@@ -179,7 +179,7 @@ export function MediaPicker({
           {selectedAssets.map((asset) => (
             <figure className={styles.assetCard} key={asset.id}>
               <Image
-                alt={asset.prompt ?? "Draft attachment"}
+                alt={asset.prompt ?? "첨부 이미지"}
                 className={styles.assetImage}
                 height={320}
                 src={asset.url}
@@ -187,9 +187,9 @@ export function MediaPicker({
                 width={320}
               />
               <figcaption className={styles.assetMeta}>
-                <span>{asset.type === "generated-image" ? "AI draft" : "Upload"}</span>
+                <span>{asset.type === "generated-image" ? "AI 이미지" : "업로드 이미지"}</span>
                 <button className={styles.removeButton} onClick={() => handleRemove(asset.id)} type="button">
-                  Remove
+                  삭제
                 </button>
               </figcaption>
             </figure>

@@ -22,7 +22,7 @@ export function LogoutButton() {
 
   return (
     <button className="button-secondary" disabled={isPending} onClick={handleClick} type="button">
-      {isPending ? "Logging out..." : "Log out"}
+      {isPending ? "로그아웃 중..." : "로그아웃"}
     </button>
   );
 }

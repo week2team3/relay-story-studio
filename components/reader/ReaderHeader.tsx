@@ -41,17 +41,17 @@ export function ReaderHeader({ title, sharePath, endingType }: ReaderHeaderProps
 
   return (
     <header className={styles.header}>
-      <p className={styles.kicker}>Branch reader</p>
+      <p className={styles.kicker}>리더</p>
       <h1 className={styles.title}>{title}</h1>
       <div className={styles.metaRow}>
-        <span className={styles.metaPill}>{endingType === "manual" ? "User ending" : "Auto ending"}</span>
+        <span className={styles.metaPill}>{endingType === "manual" ? "사용자 엔딩" : "자동 엔딩"}</span>
         <button
           className={styles.metaLink}
           onClick={handleCopyShareUrl}
           title={shareUrl}
           type="button"
         >
-          {copied ? "Copied" : "Copy reader link"}
+          {copied ? "복사됨" : "리더 링크 복사"}
         </button>
       </div>
     </header>

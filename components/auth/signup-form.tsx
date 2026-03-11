@@ -43,7 +43,7 @@ export function SignupForm() {
       const data = (await response.json()) as { error?: string };
 
       if (!response.ok) {
-        setError(data.error ?? "Signup failed.");
+        setError(data.error ?? "회원가입에 실패했습니다.");
         setIsSubmitting(false);
         return;
       }
@@ -56,25 +56,24 @@ export function SignupForm() {
   return (
     <form className={`glass-panel ${styles.panel}`} onSubmit={handleSubmit}>
       <div className="stack">
-        <h2 className={styles.title}>Create account</h2>
+        <h2 className={styles.title}>회원가입</h2>
         <p className={`body-copy ${styles.helper}`}>
-          Signup writes the user record and starts a session immediately, so the home page becomes
-          usable on the first request.
+          닉네임과 계정을 만들면 바로 작업을 시작할 수 있습니다.
         </p>
       </div>
 
       <div className="field">
-        <label htmlFor="nickname">Nickname</label>
+        <label htmlFor="nickname">닉네임</label>
         <input id="nickname" maxLength={24} minLength={2} name="nickname" type="text" required />
       </div>
 
       <div className="field">
-        <label htmlFor="email">Email</label>
+        <label htmlFor="email">이메일</label>
         <input autoComplete="email" id="email" name="email" type="email" required />
       </div>
 
       <div className="field">
-        <label htmlFor="password">Password</label>
+        <label htmlFor="password">비밀번호</label>
         <input
           autoComplete="new-password"
           id="password"
@@ -89,10 +88,10 @@ export function SignupForm() {
 
       <div className={styles.footer}>
         <Link className="button-ghost" href={loginHref}>
-          Already have an account?
+          로그인
         </Link>
         <button className="button-primary" disabled={isSubmitting} type="submit">
-          {isSubmitting ? "Creating..." : "Create account"}
+          {isSubmitting ? "가입 중..." : "회원가입"}
         </button>
       </div>
     </form>
