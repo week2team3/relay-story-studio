@@ -103,11 +103,19 @@
     linear-gradient(90deg, rgba(47, 34, 22, 0.045) 1px, transparent 1px);
   background-position: 0 0, 0 0;
   background-size: 28px 28px;
+  cursor: grab;
+}
+
+.canvasSurfacePanning {
+  cursor: grabbing;
+  user-select: none;
 }
 
 .canvasInner {
   position: relative;
   border-radius: 30px;
+  min-width: 100%;
+  min-height: calc(100dvh - 160px);
 }
 
 .edgeLayer {

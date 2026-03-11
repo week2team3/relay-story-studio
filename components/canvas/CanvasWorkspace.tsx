@@ -20,6 +20,13 @@ type DragState = {
   offsetY: number;
 } | null;
 
+type PanState = {
+  startClientX: number;
+  startClientY: number;
+  startScrollLeft: number;
+  startScrollTop: number;
+} | null;
+
 export function CanvasWorkspace({ detail }: CanvasWorkspaceProps) {
   const [nodes, setNodes] = useState(detail.nodes);
   const [selectedNodeId, setSelectedNodeId] = useState(detail.nodes[0]?.id ?? "");
@@ -28,10 +35,12 @@ export function CanvasWorkspace({ detail }: CanvasWorkspaceProps) {
   const [draftText, setDraftText] = useState("");
   const [endingChecked, setEndingChecked] = useState(false);
   const [dragState, setDragState] = useState<DragState>(null);
+  const [panState, setPanState] = useState<PanState>(null);
   const [copied, setCopied] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitMessage, setSubmitMessage] = useState<string | null>(null);
   const nodesRef = useRef(nodes);
+  const canvasSurfaceRef = useRef<HTMLDivElement | null>(null);
   const canvasInnerRef = useRef<HTMLDivElement | null>(null);
 
   const selectedNode = nodes.find((node) => node.id === selectedNodeId) ?? nodes[0];
@@ -103,6 +112,37 @@ export function CanvasWorkspace({ detail }: CanvasWorkspaceProps) {
   }, [dragState, viewerMode]);
 
   useEffect(() => {
+    if (!panState) {
+      return;
+    }
+
+    const activePanState = panState;
+
+    function handlePointerMove(event: PointerEvent) {
+      const surface = canvasSurfaceRef.current;
+
+      if (!surface) {
+        return;
+      }
+
+      surface.scrollLeft = activePanState.startScrollLeft - (event.clientX - activePanState.startClientX);
+      surface.scrollTop = activePanState.startScrollTop - (event.clientY - activePanState.startClientY);
+    }
+
+    function handlePointerUp() {
+      setPanState(null);
+    }
+
+    window.addEventListener("pointermove", handlePointerMove);
+    window.addEventListener("pointerup", handlePointerUp);
+
+    return () => {
+      window.removeEventListener("pointermove", handlePointerMove);
+      window.removeEventListener("pointerup", handlePointerUp);
+    };
+  }, [panState]);
+
+  useEffect(() => {
     if (!copied) {
       return;
     }
@@ -131,6 +171,26 @@ export function CanvasWorkspace({ detail }: CanvasWorkspaceProps) {
     setSelectedNodeId(node.id);
     setWriteOpen(false);
     setSubmitMessage(null);
+  }
+
+  function handleCanvasPointerDown(event: ReactPointerEvent<HTMLDivElement>) {
+    if (event.target !== event.currentTarget) {
+      return;
+    }
+
+    const surface = canvasSurfaceRef.current;
+
+    if (!surface) {
+      return;
+    }
+
+    event.currentTarget.setPointerCapture(event.pointerId);
+    setPanState({
+      startClientX: event.clientX,
+      startClientY: event.clientY,
+      startScrollLeft: surface.scrollLeft,
+      startScrollTop: surface.scrollTop,
+    });
   }
 
   function handlePointerDown(node: CanvasWorkspaceNode, event: ReactPointerEvent<HTMLButtonElement>) {
@@ -248,10 +308,14 @@ export function CanvasWorkspace({ detail }: CanvasWorkspaceProps) {
           </div>
         </header>
 
-        <div className={styles.canvasSurface}>
+        <div
+          className={`${styles.canvasSurface} ${panState ? styles.canvasSurfacePanning : ""}`}
+          ref={canvasSurfaceRef}
+        >
           <div
             className={styles.canvasInner}
             ref={canvasInnerRef}
+            onPointerDown={handleCanvasPointerDown}
             style={{ width: canvasWidth, height: canvasHeight }}
           >
             <svg className={styles.edgeLayer}>
