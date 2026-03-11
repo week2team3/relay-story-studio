@@ -42,22 +42,6 @@ export function CanvasWorkspace({ detail }: CanvasWorkspaceProps) {
   const canvasWidth = Math.max(1520, ...nodes.map((node) => node.position.x + NODE_WIDTH + 220));
   const canvasHeight = Math.max(920, ...nodes.map((node) => node.position.y + NODE_HEIGHT + 240));
 
-  if (!selectedNode) {
-    return (
-      <main className={styles.page}>
-        <section className={styles.workspace}>
-          <div className={styles.topBar}>
-            <div className={styles.titleBlock}>
-              <span className={styles.eyebrow}>Role 2 canvas workspace</span>
-              <h1 className={styles.title}>{detail.canvas.title}</h1>
-              <p className={styles.subtitle}>No nodes were returned for this canvas yet.</p>
-            </div>
-          </div>
-        </section>
-      </main>
-    );
-  }
-
   useEffect(() => {
     nodesRef.current = nodes;
   }, [nodes]);
@@ -66,6 +50,8 @@ export function CanvasWorkspace({ detail }: CanvasWorkspaceProps) {
     if (!dragState) {
       return;
     }
+
+    const activeDragState = dragState;
 
     function handlePointerMove(event: PointerEvent) {
       const pointer = getCanvasPointerPosition(event, canvasInnerRef.current);
@@ -76,12 +62,12 @@ export function CanvasWorkspace({ detail }: CanvasWorkspaceProps) {
 
       setNodes((currentNodes) =>
         currentNodes.map((node) =>
-          node.id === dragState.nodeId
+          node.id === activeDragState.nodeId
             ? {
                 ...node,
                 position: {
-                  x: Math.max(60, pointer.x - dragState.offsetX),
-                  y: Math.max(80, pointer.y - dragState.offsetY),
+                  x: Math.max(60, pointer.x - activeDragState.offsetX),
+                  y: Math.max(80, pointer.y - activeDragState.offsetY),
                 },
               }
             : node,
@@ -90,7 +76,7 @@ export function CanvasWorkspace({ detail }: CanvasWorkspaceProps) {
     }
 
     async function handlePointerUp() {
-      const movedNode = nodesRef.current.find((node) => node.id === dragState.nodeId);
+      const movedNode = nodesRef.current.find((node) => node.id === activeDragState.nodeId);
 
       if (movedNode && viewerMode === "authenticated") {
         try {
@@ -124,6 +110,22 @@ export function CanvasWorkspace({ detail }: CanvasWorkspaceProps) {
     const timeout = window.setTimeout(() => setCopied(false), 1500);
     return () => window.clearTimeout(timeout);
   }, [copied]);
+
+  if (!selectedNode) {
+    return (
+      <main className={styles.page}>
+        <section className={styles.workspace}>
+          <div className={styles.topBar}>
+            <div className={styles.titleBlock}>
+              <span className={styles.eyebrow}>Role 2 canvas workspace</span>
+              <h1 className={styles.title}>{detail.canvas.title}</h1>
+              <p className={styles.subtitle}>No nodes were returned for this canvas yet.</p>
+            </div>
+          </div>
+        </section>
+      </main>
+    );
+  }
 
   function handleSelect(node: CanvasWorkspaceNode) {
     setSelectedNodeId(node.id);
