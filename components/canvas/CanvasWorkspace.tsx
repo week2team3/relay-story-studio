@@ -708,11 +708,9 @@ export function CanvasWorkspace({ detail }: CanvasWorkspaceProps) {
                 ) : (
                   <span className={styles.statusPill}>Select an ending node to open the reader.</span>
                 )}
-                <span className={styles.statusPill}>
-                  {viewerMode === "authenticated"
-                    ? `Logged in as ${detail.viewer?.nickname ?? "writer"}`
-                    : "Guest mode: read only"}
-                </span>
+                <a className={`${styles.tertiaryButton} ${styles.controlHomeLink}`} href="/home">
+                  Back to home
+                </a>
               </div>
             </div>
           ) : null}

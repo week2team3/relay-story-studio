@@ -483,6 +483,10 @@
   margin-top: 14px;
 }
 
+.controlHomeLink {
+  margin-left: auto;
+}
+
 .composerOverlay {
   position: fixed;
   inset: 0;
