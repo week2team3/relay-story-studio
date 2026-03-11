@@ -93,21 +93,23 @@ export function CanvasWorkspace({ detail }: CanvasWorkspaceProps) {
       return;
     }
 
+    const activeSurface = surface;
+
     function updateViewport() {
       setViewport({
-        scrollLeft: surface.scrollLeft,
-        scrollTop: surface.scrollTop,
-        width: surface.clientWidth,
-        height: surface.clientHeight,
+        scrollLeft: activeSurface.scrollLeft,
+        scrollTop: activeSurface.scrollTop,
+        width: activeSurface.clientWidth,
+        height: activeSurface.clientHeight,
       });
     }
 
     updateViewport();
-    surface.addEventListener("scroll", updateViewport, { passive: true });
+    activeSurface.addEventListener("scroll", updateViewport, { passive: true });
     window.addEventListener("resize", updateViewport);
 
     return () => {
-      surface.removeEventListener("scroll", updateViewport);
+      activeSurface.removeEventListener("scroll", updateViewport);
       window.removeEventListener("resize", updateViewport);
     };
   }, [canvasWidth, canvasHeight]);
