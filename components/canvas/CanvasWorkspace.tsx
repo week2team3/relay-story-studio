@@ -805,7 +805,12 @@ export function CanvasWorkspace({ detail }: CanvasWorkspaceProps) {
                   <label className={styles.fieldLabel}>Parent context</label>
                   <div className={styles.contextBox}>{selectedNode.content}</div>
 
-                  <SummaryDisclosure baseNodeId={selectedNode.id} canvasId={detail.canvas.id} />
+                  <SummaryDisclosure
+                    baseNodeId={selectedNode.id}
+                    canvasId={detail.canvas.id}
+                    defaultOpen
+                    triggerLabel="Previous node summary"
+                  />
                 </aside>
 
                 <div className={styles.composerMain}>
