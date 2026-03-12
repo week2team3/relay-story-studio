@@ -31,6 +31,10 @@ const WORLD_MIN_WIDTH = 5200;
 const WORLD_MIN_HEIGHT = 3200;
 const LIVE_SYNC_INTERVAL_MS = 1200;
 const PRESENCE_SYNC_INTERVAL_MS = 5000;
+const LEGACY_AUTO_ENDING_TITLE = "Auto ending";
+const LEGACY_AUTO_ENDING_COPY = "This branch has reached the relay limit and closes here.";
+const LOCALIZED_AUTO_ENDING_TITLE = "자동 엔딩";
+const LOCALIZED_AUTO_ENDING_COPY = "이 분기는 최대 길이에 도달해 여기서 마무리됩니다.";
 
 type CanvasWorkspaceProps = {
   detail: CanvasWorkspaceData;
@@ -753,7 +757,7 @@ export function CanvasWorkspace({ detail }: CanvasWorkspaceProps) {
                     {badgeLabel}
                   </span>
                   <h2 className={styles.nodeTitle}>{getNodeHeading(node)}</h2>
-                  <p className={styles.nodeExcerpt}>{getExcerpt(node.content)}</p>
+                  <p className={styles.nodeExcerpt}>{getExcerpt(getDisplayNodeContent(node))}</p>
                 </button>
               );
             })}
@@ -790,7 +794,7 @@ export function CanvasWorkspace({ detail }: CanvasWorkspaceProps) {
                 ))}
               </div>
             ) : null}
-            <p className={styles.bodyCopy}>{selectedNode.content}</p>
+            <p className={styles.bodyCopy}>{getDisplayNodeContent(selectedNode)}</p>
             <div className={styles.drawerActions}>
               <div className={styles.buttonRow}>
                 {selectedNode.isEnding ? (
@@ -949,14 +953,14 @@ export function CanvasWorkspace({ detail }: CanvasWorkspaceProps) {
               <div className={styles.composerGrid}>
                 <aside className={styles.composerSidebar}>
                   <label className={styles.fieldLabel}>부모 본문</label>
-                  <div className={styles.contextBox}>{selectedNode.content}</div>
+                  <div className={styles.contextBox}>{getDisplayNodeContent(selectedNode)}</div>
                   <label className={styles.fieldLabel}>이전 본문</label>
                   <div className={styles.contextBox}>
                     {previousNodes.length === 0 ? (
                       "이전 본문이 없습니다."
                     ) : (
                       previousNodes
-                        .map((node, index) => `${index + 1}. ${node.content}`)
+                        .map((node, index) => `${index + 1}. ${getDisplayNodeContent(node)}`)
                         .join("\n\n")
                     )}
                   </div>
@@ -1060,12 +1064,16 @@ function getNodeHeading(node: CanvasWorkspaceNode) {
     return "루트 노드";
   }
 
-  if (node.title?.trim()) {
-    return node.title.trim();
+  if (node.isEnding && node.endingType === "auto-max-depth") {
+    return LOCALIZED_AUTO_ENDING_TITLE;
   }
 
-  if (node.isEnding && node.endingType === "auto-max-depth") {
-    return "자동 엔딩";
+  if (node.title?.trim()) {
+    if (node.title.trim() === LEGACY_AUTO_ENDING_TITLE) {
+      return LOCALIZED_AUTO_ENDING_TITLE;
+    }
+
+    return node.title.trim();
   }
 
   if (node.isEnding) {
@@ -1111,6 +1119,18 @@ function getNodeBadgeTooltip(node: CanvasWorkspaceNode, maxUserNodesPerBranch: n
 
 function getExcerpt(content: string) {
   return content.length > 96 ? `${content.slice(0, 96)}...` : content;
+}
+
+function getDisplayNodeContent(node: CanvasWorkspaceNode) {
+  if (node.isEnding && node.endingType === "auto-max-depth") {
+    const trimmed = node.content.trim();
+
+    if (!trimmed || trimmed === LEGACY_AUTO_ENDING_COPY) {
+      return LOCALIZED_AUTO_ENDING_COPY;
+    }
+  }
+
+  return node.content;
 }
 
 function formatNodeTimestamp(value: string) {

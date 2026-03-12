@@ -20,7 +20,8 @@ import { AssetModel, CanvasModel, NodeModel, ParticipationModel } from "@/models
 
 const DEFAULT_MAX_USER_NODES = 12;
 const MAX_ALLOWED_USER_NODES = 50;
-const AUTO_ENDING_COPY = "This branch has reached the relay limit and closes here.";
+const AUTO_ENDING_TITLE = "자동 엔딩";
+const AUTO_ENDING_COPY = "이 분기는 최대 길이에 도달해 여기서 마무리됩니다.";
 const MAX_NODE_IMAGE_ASSETS = 1;
 
 function assertTitle(title: string) {
@@ -202,7 +203,7 @@ async function createAutoEndingNode(
         ancestorIds,
         depth,
         userNodeCountInPath,
-        title: "Auto ending",
+        title: AUTO_ENDING_TITLE,
         content: AUTO_ENDING_COPY,
         isEnding: true,
         endingType: "auto-max-depth",

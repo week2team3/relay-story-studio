@@ -9,6 +9,9 @@ type ReaderAsset = {
   prompt: string | null;
 };
 
+const LEGACY_AUTO_ENDING_COPY = "This branch has reached the relay limit and closes here.";
+const LOCALIZED_AUTO_ENDING_COPY = "이 분기는 최대 길이에 도달해 여기서 마무리됩니다.";
+
 function normalizeText(content: string) {
   return content
     .split(/\n{2,}/)
@@ -29,6 +32,22 @@ function buildTextSegment(nodeId: string, content: string): ReaderSegment | null
     kind: "text",
     text
   };
+}
+
+function getReaderNodeText(node: {
+  content: string;
+  isEnding: boolean;
+  endingType: "manual" | "auto-max-depth" | null;
+}) {
+  if (node.isEnding && node.endingType === "auto-max-depth") {
+    const trimmed = node.content.trim();
+
+    if (!trimmed || trimmed === LEGACY_AUTO_ENDING_COPY) {
+      return LOCALIZED_AUTO_ENDING_COPY;
+    }
+  }
+
+  return node.content;
 }
 
 function buildImageSegments(nodeId: string, assets: ReaderAsset[]): ReaderSegment[] {
@@ -61,7 +80,7 @@ export async function buildReaderBranch(shareKey: string, endingNodeId: string):
   const segments: ReaderSegment[] = [];
 
   for (const node of nodes) {
-    const textSegment = buildTextSegment(node.id, node.content);
+    const textSegment = buildTextSegment(node.id, getReaderNodeText(node));
 
     if (textSegment) {
       segments.push(textSegment);
