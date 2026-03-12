@@ -9,6 +9,7 @@ type SummaryDisclosureProps = {
   baseNodeId: string;
   triggerLabel?: string;
   className?: string;
+  defaultOpen?: boolean;
 };
 
 type SummaryState =
@@ -31,15 +32,16 @@ export function SummaryDisclosure({
   canvasId,
   baseNodeId,
   triggerLabel = "Show previous summary",
-  className
+  className,
+  defaultOpen = false
 }: SummaryDisclosureProps) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(defaultOpen);
   const [state, setState] = useState<SummaryState>({ status: "idle" });
 
   useEffect(() => {
-    setOpen(false);
+    setOpen(defaultOpen);
     setState({ status: "idle" });
-  }, [canvasId, baseNodeId]);
+  }, [canvasId, baseNodeId, defaultOpen]);
 
   useEffect(() => {
     if (!open || state.status !== "idle") {
@@ -144,7 +146,7 @@ export function SummaryDisclosure({
           ) : null}
           {state.status === "not_needed" ? (
             <p className={styles.message}>
-              This branch is still short enough that the earlier context fits without a generated summary.
+              There are no previous nodes to summarize for this branch yet.
             </p>
           ) : null}
           {state.status === "ready" ? (

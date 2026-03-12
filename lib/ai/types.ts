@@ -13,7 +13,7 @@ export type SummaryMeta = {
 
 export type SummaryReadyResponse = {
   status: "ready";
-  source: "cache" | "openai";
+  source: "cache" | "openai" | "inline";
   summary: SummarySnapshot;
   meta: SummaryMeta;
 };

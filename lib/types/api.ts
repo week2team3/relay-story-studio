@@ -11,7 +11,8 @@ import type {
 export type SignupRequest = {
   email: string;
   password: string;
-  nickname: string;
+  nickname?: string;
+  name?: string;
 };
 
 export type LoginRequest = {
@@ -69,4 +70,15 @@ export type UpdateNodePositionResponse = {
 
 export type ReaderBranchResponse = {
   branch: ReaderBranchContent;
+};
+
+export type CollaboratorPresence = {
+  userId: string;
+  nickname: string;
+  lastSeenAt: string;
+  isCurrentUser: boolean;
+};
+
+export type CanvasPresenceResponse = {
+  collaborators: CollaboratorPresence[];
 };

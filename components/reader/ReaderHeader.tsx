@@ -42,12 +42,12 @@ export function ReaderHeader({ title, sharePath, canvasPath, endingType }: Reade
 
   return (
     <header className={styles.header}>
-      <p className={styles.kicker}>Branch reader</p>
+      <p className={styles.kicker}>리더</p>
       <h1 className={styles.title}>{title}</h1>
       <div className={styles.metaRow}>
-        <span className={styles.metaPill}>{endingType === "manual" ? "User ending" : "Auto ending"}</span>
+        <span className={styles.metaPill}>{endingType === "manual" ? "사용자 엔딩" : "자동 엔딩"}</span>
         <a className={styles.metaLink} href={canvasPath}>
-          Close reader
+          리더 닫기
         </a>
         <button
           className={styles.metaLink}
@@ -55,7 +55,7 @@ export function ReaderHeader({ title, sharePath, canvasPath, endingType }: Reade
           title={shareUrl}
           type="button"
         >
-          {copied ? "Copied" : "Copy reader link"}
+          {copied ? "복사됨" : "리더 링크 복사"}
         </button>
       </div>
     </header>

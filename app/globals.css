@@ -31,7 +31,7 @@ body {
     radial-gradient(circle at top right, rgba(111, 142, 114, 0.12), transparent 26%),
     linear-gradient(180deg, #f7f1e7 0%, #efe4d6 100%);
   color: var(--ink);
-  font-family: Georgia, "Times New Roman", serif;
+  font-family: "Noto Sans KR", sans-serif;
 }
 
 a {

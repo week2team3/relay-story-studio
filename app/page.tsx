@@ -14,20 +14,19 @@ export default async function LandingPage() {
     <main className="page-shell">
       <section className={`glass-panel ${styles.hero}`}>
         <div className="stack">
-          <p className="eyebrow">Relay Novel Platform</p>
-          <h1 className="headline">Stories split, writers continue, endings multiply.</h1>
+          <p className="eyebrow">릴레이 스토리</p>
+          <h1 className="headline">이야기를 잇고, 분기를 만들고, 결말을 완성하세요.</h1>
           <p className={`body-copy ${styles.lede}`}>
-            Role 1 owns the auth and backend foundation. This landing page stays intentionally
-            small until the canvas, reader, and AI flows land from the other Codex roles.
+            하나의 시작에서 여러 갈래의 이야기를 함께 이어 쓰는 협업 소설 공간입니다.
           </p>
         </div>
 
         <div className="button-row">
           <Link className="button-primary" href="/signup">
-            Create account
+            회원가입
           </Link>
           <Link className="button-secondary" href="/login">
-            Log in
+            로그인
           </Link>
         </div>
       </section>

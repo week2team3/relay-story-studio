@@ -48,18 +48,17 @@ export async function createUploadedAsset(userId: string, input: CreateUploadedA
   const assetId = new Types.ObjectId();
   const extension = getExtensionForMimeType(input.mimeType);
   const fileName = `${assetId.toString()}${extension}`;
-  await writeStoredAsset(fileName, input.bytes);
+  const url = await writeStoredAsset(fileName, input.mimeType, input.bytes);
 
   const asset = await AssetModel.create({
     _id: assetId,
     canvasId,
     nodeId: null,
     type: "uploaded-image",
-    url: `/api/assets/file/${fileName}`,
+    url,
     prompt: null,
     createdBy
   });
 
   return serializeAsset(asset);
 }
-

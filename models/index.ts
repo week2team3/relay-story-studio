@@ -6,6 +6,8 @@ export type { DraftDocument } from "@/models/draft";
 export { DraftModel } from "@/models/draft";
 export type { NodeDocument } from "@/models/node";
 export { NodeModel } from "@/models/node";
+export type { PresenceDocument } from "@/models/presence";
+export { PresenceModel } from "@/models/presence";
 export type { ParticipationDocument } from "@/models/participation";
 export { ParticipationModel } from "@/models/participation";
 export type { SummaryDocument } from "@/models/summary";

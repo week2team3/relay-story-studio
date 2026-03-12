@@ -1,11 +1,18 @@
-import { CreateCanvasNodeInput, CreateCanvasNodeResult, CanvasPositionPayload, PersistNodePositionResult } from "./types";
+import {
+  CanvasPresenceResult,
+  CreateCanvasNodeInput,
+  CreateCanvasNodeResult,
+  CanvasPositionPayload,
+  CanvasWorkspaceData,
+  PersistNodePositionResult
+} from "./types";
 
 async function readApiError(response: Response) {
   try {
     const payload = (await response.json()) as { error?: string };
-    return payload.error ?? "Unexpected server error.";
+    return payload.error ?? "예상하지 못한 서버 오류가 발생했습니다.";
   } catch {
-    return "Unexpected server error.";
+    return "예상하지 못한 서버 오류가 발생했습니다.";
   }
 }
 
@@ -39,4 +46,38 @@ export async function createCanvasNode(input: CreateCanvasNodeInput) {
   }
 
   return (await response.json()) as CreateCanvasNodeResult;
+}
+
+export async function fetchCanvasWorkspace(shareKey: string) {
+  const response = await fetch(`/api/canvases/${shareKey}`, {
+    cache: "no-store",
+    headers: {
+      "Content-Type": "application/json",
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(await readApiError(response));
+  }
+
+  return (await response.json()) as CanvasWorkspaceData;
+}
+
+export async function heartbeatCanvasPresence(shareKey: string) {
+  await fetch(`/api/canvases/${shareKey}/presence`, {
+    method: "POST",
+    cache: "no-store"
+  });
+}
+
+export async function fetchCanvasPresence(shareKey: string) {
+  const response = await fetch(`/api/canvases/${shareKey}/presence`, {
+    cache: "no-store"
+  });
+
+  if (!response.ok) {
+    throw new Error(await readApiError(response));
+  }
+
+  return (await response.json()) as CanvasPresenceResult;
 }

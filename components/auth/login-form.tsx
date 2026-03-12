@@ -42,7 +42,7 @@ export function LoginForm() {
       const data = (await response.json()) as { error?: string };
 
       if (!response.ok) {
-        setError(data.error ?? "Login failed.");
+        setError(data.error ?? "로그인에 실패했습니다.");
         setIsSubmitting(false);
         return;
       }
@@ -55,20 +55,19 @@ export function LoginForm() {
   return (
     <form className={`glass-panel ${styles.panel}`} onSubmit={handleSubmit}>
       <div className="stack">
-        <h2 className={styles.title}>Log in</h2>
+        <h2 className={styles.title}>로그인</h2>
         <p className={`body-copy ${styles.helper}`}>
-          Email/password auth is handled by Role 1 so the rest of the team can build against a
-          stable session contract.
+          이메일과 비밀번호를 입력해 작업을 이어가세요.
         </p>
       </div>
 
       <div className="field">
-        <label htmlFor="email">Email</label>
+        <label htmlFor="email">이메일</label>
         <input autoComplete="email" id="email" name="email" type="email" required />
       </div>
 
       <div className="field">
-        <label htmlFor="password">Password</label>
+        <label htmlFor="password">비밀번호</label>
         <input
           autoComplete="current-password"
           id="password"
@@ -83,10 +82,10 @@ export function LoginForm() {
 
       <div className={styles.footer}>
         <Link className="button-ghost" href={signupHref}>
-          Need an account?
+          회원가입
         </Link>
         <button className="button-primary" disabled={isSubmitting} type="submit">
-          {isSubmitting ? "Logging in..." : "Log in"}
+          {isSubmitting ? "로그인 중..." : "로그인"}
         </button>
       </div>
     </form>

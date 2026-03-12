@@ -15,18 +15,16 @@ export default async function LoginPage() {
     <main className="page-shell">
       <div className={styles.shell}>
         <Link className="button-ghost" href="/">
-          Back to landing
+          처음으로
         </Link>
 
         <section className={styles.grid}>
           <div className={`glass-panel ${styles.panel}`}>
             <div className="stack">
-              <p className="eyebrow">Session Contract</p>
-              <h1 className="headline">Role 1 keeps the auth surface stable.</h1>
+              <p className="eyebrow">로그인</p>
+              <h1 className="headline">이어서 작성하려면 로그인하세요.</h1>
               <p className={`body-copy ${styles.copy}`}>
-                The rest of the team can assume email/password login, a signed session cookie, and
-                authenticated write routes. Anonymous readers still reach shared canvases through
-                their `shareKey`.
+                이메일과 비밀번호로 로그인하면 내가 참여한 캔버스를 바로 열 수 있습니다.
               </p>
             </div>
           </div>

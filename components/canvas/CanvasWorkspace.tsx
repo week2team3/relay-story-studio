@@ -1,10 +1,14 @@
 "use client";
 
 import { type PointerEvent as ReactPointerEvent, useEffect, useRef, useState } from "react";
-import { SummaryDisclosure } from "@/components/ai/SummaryDisclosure";
 import { MediaPicker } from "@/components/media/MediaPicker";
 import type { MediaAsset } from "@/lib/media/types";
-import { createCanvasNode, persistNodePosition } from "./canvasApi";
+import {
+  createCanvasNode,
+  fetchCanvasWorkspace,
+  heartbeatCanvasPresence,
+  persistNodePosition
+} from "./canvasApi";
 import styles from "./CanvasWorkspace.module.css";
 import { CanvasWorkspaceData, CanvasWorkspaceNode } from "./types";
 
@@ -25,6 +29,8 @@ const WORLD_PADDING_TOP = 620;
 const WORLD_PADDING_BOTTOM = 960;
 const WORLD_MIN_WIDTH = 5200;
 const WORLD_MIN_HEIGHT = 3200;
+const LIVE_SYNC_INTERVAL_MS = 1200;
+const PRESENCE_SYNC_INTERVAL_MS = 5000;
 
 type CanvasWorkspaceProps = {
   detail: CanvasWorkspaceData;
@@ -66,6 +72,7 @@ export function CanvasWorkspace({ detail }: CanvasWorkspaceProps) {
   const [controlsOpen, setControlsOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLiveSyncing, setIsLiveSyncing] = useState(true);
   const [submitMessage, setSubmitMessage] = useState<string | null>(null);
   const [viewport, setViewport] = useState<ViewportState>({
     scrollLeft: 0,
@@ -78,12 +85,19 @@ export function CanvasWorkspace({ detail }: CanvasWorkspaceProps) {
   const canvasInnerRef = useRef<HTMLDivElement | null>(null);
   const miniMapFrameRef = useRef<HTMLDivElement | null>(null);
   const initializedViewportRef = useRef(false);
+  const syncSignatureRef = useRef(buildCanvasSyncSignature(detail));
 
   const selectedNode = nodes.find((node) => node.id === selectedNodeId) ?? nodes[0];
   const selectedNodeAssets = selectedNode
     ? selectedNode.imageAssetIds.flatMap((assetId) => {
         const asset = assets.find((candidate) => candidate.id === assetId);
         return asset ? [asset] : [];
+      })
+    : [];
+  const previousNodes = selectedNode
+    ? selectedNode.ancestorIds.flatMap((ancestorId) => {
+        const node = nodes.find((candidate) => candidate.id === ancestorId);
+        return node ? [node] : [];
       })
     : [];
   const rootNode = nodes.find((node) => node.parentNodeId === null) ?? nodes[0];
@@ -142,6 +156,96 @@ export function CanvasWorkspace({ detail }: CanvasWorkspaceProps) {
   useEffect(() => {
     nodesRef.current = nodes;
   }, [nodes]);
+
+  useEffect(() => {
+    syncSignatureRef.current = buildCanvasSyncSignature({
+      ...detail,
+      nodes,
+      assets,
+    });
+  }, [assets, detail, nodes]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function syncWorkspace() {
+      if (cancelled) {
+        return;
+      }
+
+      if (typeof document !== "undefined" && document.visibilityState === "hidden") {
+        return;
+      }
+
+      if (dragState || panState || miniMapDragging || isSubmitting) {
+        return;
+      }
+
+      try {
+        const latestDetail = await fetchCanvasWorkspace(detail.canvas.shareKey);
+
+        if (cancelled) {
+          return;
+        }
+
+        const nextSignature = buildCanvasSyncSignature(latestDetail);
+
+        if (nextSignature === syncSignatureRef.current) {
+          setIsLiveSyncing(true);
+          return;
+        }
+
+        setNodes(latestDetail.nodes);
+        setAssets(latestDetail.assets);
+        setSelectedNodeId((currentSelectedNodeId) =>
+          latestDetail.nodes.some((node) => node.id === currentSelectedNodeId)
+            ? currentSelectedNodeId
+            : latestDetail.nodes[0]?.id ?? "",
+        );
+        syncSignatureRef.current = nextSignature;
+        setIsLiveSyncing(true);
+      } catch {
+        if (!cancelled) {
+          setIsLiveSyncing(false);
+        }
+      }
+    }
+
+    void syncWorkspace();
+    const interval = window.setInterval(() => {
+      void syncWorkspace();
+    }, LIVE_SYNC_INTERVAL_MS);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, [detail, dragState, isSubmitting, miniMapDragging, panState]);
+
+  useEffect(() => {
+    async function keepPresenceAlive() {
+      try {
+        if (viewerMode === "authenticated") {
+          await heartbeatCanvasPresence(detail.canvas.shareKey);
+        }
+      } catch {
+        return;
+      }
+    }
+
+    if (viewerMode !== "authenticated") {
+      return;
+    }
+
+    void keepPresenceAlive();
+    const interval = window.setInterval(() => {
+      void keepPresenceAlive();
+    }, PRESENCE_SYNC_INTERVAL_MS);
+
+    return () => {
+      window.clearInterval(interval);
+    };
+  }, [detail.canvas.shareKey, viewerMode]);
 
   useEffect(() => {
     const surface = canvasSurfaceRef.current;
@@ -245,7 +349,7 @@ export function CanvasWorkspace({ detail }: CanvasWorkspaceProps) {
             currentNodes.map((node) => (node.id === result.node.id ? result.node : node)),
           );
         } catch (error) {
-          setSubmitMessage(error instanceof Error ? error.message : "Could not save node position.");
+          setSubmitMessage(error instanceof Error ? error.message : "노드 위치를 저장하지 못했습니다.");
         }
       }
 
@@ -355,7 +459,7 @@ export function CanvasWorkspace({ detail }: CanvasWorkspaceProps) {
           <div className={styles.emptyState}>
             <span className={styles.eyebrow}>Canvas workspace</span>
             <h1 className={styles.title}>{detail.canvas.title}</h1>
-            <p className={styles.subtitle}>No nodes were returned for this canvas yet.</p>
+            <p className={styles.subtitle}>아직 이 캔버스에 노드가 없습니다.</p>
           </div>
         </section>
       </main>
@@ -429,7 +533,7 @@ export function CanvasWorkspace({ detail }: CanvasWorkspaceProps) {
   }
 
   function handlePointerDown(node: CanvasWorkspaceNode, event: ReactPointerEvent<HTMLButtonElement>) {
-    if (viewerMode !== "authenticated") {
+    if (viewerMode !== "authenticated" || node.parentNodeId === null) {
       return;
     }
 
@@ -471,12 +575,12 @@ export function CanvasWorkspace({ detail }: CanvasWorkspaceProps) {
     }
 
     if (!draftTitle.trim()) {
-      setSubmitMessage("Add a node title before publishing.");
+      setSubmitMessage("노드 제목을 입력해 주세요.");
       return;
     }
 
     if (!draftText.trim()) {
-      setSubmitMessage("Write the next node content before publishing.");
+      setSubmitMessage("본문을 입력해 주세요.");
       return;
     }
 
@@ -526,11 +630,11 @@ export function CanvasWorkspace({ detail }: CanvasWorkspaceProps) {
       resetWritePanelState();
       setSubmitMessage(
         result.autoEndingNode
-          ? "Node published and the branch auto-completed at max depth."
-          : "Node published.",
+          ? "노드를 등록했고 분기가 최대 길이에 도달해 자동 엔딩이 추가되었습니다."
+          : "노드를 등록했습니다.",
       );
     } catch (error) {
-      setSubmitMessage(error instanceof Error ? error.message : "Could not publish the next node.");
+      setSubmitMessage(error instanceof Error ? error.message : "다음 노드를 등록하지 못했습니다.");
     } finally {
       setIsSubmitting(false);
     }
@@ -586,7 +690,7 @@ export function CanvasWorkspace({ detail }: CanvasWorkspaceProps) {
             {forbiddenBoundaryX ? (
               <div className={styles.constraintZone} style={{ width: forbiddenBoundaryX }}>
                 <div className={styles.constraintLabel}>
-                  Branch nodes cannot move left of their parent.
+                  자식 노드는 부모보다 왼쪽으로 이동할 수 없습니다.
                 </div>
               </div>
             ) : null}
@@ -645,22 +749,26 @@ export function CanvasWorkspace({ detail }: CanvasWorkspaceProps) {
 
         <aside className={styles.drawer}>
           <div className={styles.drawerContent} data-no-pan="true">
-            <span className={styles.sectionLabel}>Selected node</span>
+            <span className={styles.sectionLabel}>선택한 노드</span>
             <h2 className={styles.drawerTitle}>{getNodeHeading(selectedNode)}</h2>
             <div className={styles.drawerMetaStack}>
               <div className={styles.metaRow}>
                 {getNodeTypeLabel(selectedNode)} · {formatNodeTimestamp(selectedNode.createdAt)}
               </div>
               <div className={styles.authorRow}>
-                Written by {selectedNode.authorNickname?.trim() || "Unknown writer"}
+                작성자 · {selectedNode.authorNickname?.trim() || "알 수 없음"}
               </div>
+            </div>
+            <div className={styles.metaRow}>
+              {isLiveSyncing ? "실시간 동기화 중" : "실시간 동기화 재시도 중"}
             </div>
             {selectedNodeAssets.length > 0 ? (
               <div className={styles.drawerAssetGrid}>
                 {selectedNodeAssets.map((asset, index) => (
                   <figure className={styles.drawerAssetCard} key={asset.id}>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
-                      alt={asset.prompt?.trim() || `Node attachment ${index + 1}`}
+                      alt={asset.prompt?.trim() || `노드 이미지 ${index + 1}`}
                       className={styles.drawerAssetImage}
                       src={asset.url}
                     />
@@ -673,7 +781,7 @@ export function CanvasWorkspace({ detail }: CanvasWorkspaceProps) {
               <div className={styles.buttonRow}>
                 {selectedNode.isEnding ? (
                   <a className={styles.tertiaryButton} href={readHref ?? shareHref}>
-                    Open reader
+                    리더로 보기
                   </a>
                 ) : viewerMode === "authenticated" ? (
                   <button
@@ -681,11 +789,11 @@ export function CanvasWorkspace({ detail }: CanvasWorkspaceProps) {
                     onClick={() => setWriteOpen(true)}
                     type="button"
                   >
-                    Write next node
+                    다음 노드 작성
                   </button>
                 ) : (
                   <a className={styles.primaryButton} href={`/login?next=${encodeURIComponent(shareHref)}`}>
-                    Login to write
+                    로그인하고 작성하기
                   </a>
                 )}
               </div>
@@ -698,8 +806,8 @@ export function CanvasWorkspace({ detail }: CanvasWorkspaceProps) {
         <section className={styles.miniMap} data-no-pan="true">
           <div className={styles.miniMapChrome}>
             <div>
-              <h2 className={styles.miniMapTitle}>Navigator</h2>
-              <p className={styles.miniCaption}>Click or drag inside this map to move the camera.</p>
+              <h2 className={styles.miniMapTitle}>미니맵</h2>
+              <p className={styles.miniCaption}>클릭하거나 드래그해서 화면을 이동하세요.</p>
             </div>
             <div className={styles.miniMapZoom}>
               <button
@@ -757,7 +865,7 @@ export function CanvasWorkspace({ detail }: CanvasWorkspaceProps) {
             <div className={styles.controlPanel}>
               <div className={styles.controlHeader}>
                 <div>
-                  <span className={styles.sectionLabel}>Canvas menu</span>
+                  <span className={styles.sectionLabel}>캔버스 메뉴</span>
                   <h2 className={styles.controlTitle}>{detail.canvas.title}</h2>
                 </div>
                 <button
@@ -765,23 +873,23 @@ export function CanvasWorkspace({ detail }: CanvasWorkspaceProps) {
                   onClick={() => setControlsOpen(false)}
                   type="button"
                 >
-                  Close
+                  닫기
                 </button>
               </div>
 
               <div className={styles.controlActions}>
                 <button className={styles.pill} onClick={handleCopyLink} type="button">
-                  {copied ? "Link copied" : "Copy share link"}
+                  {copied ? "링크 복사됨" : "공유 링크 복사"}
                 </button>
                 {readHref ? (
                   <a className={styles.primaryPill} href={readHref}>
-                    Read branch
+                    분기 읽기
                   </a>
                 ) : (
-                  <span className={styles.statusPill}>Select an ending node to open the reader.</span>
+                  <span className={styles.statusPill}>엔딩 노드를 선택하면 리더를 열 수 있습니다.</span>
                 )}
                 <a className={`${styles.tertiaryButton} ${styles.controlHomeLink}`} href="/home">
-                  Back to home
+                  홈으로
                 </a>
               </div>
             </div>
@@ -792,7 +900,7 @@ export function CanvasWorkspace({ detail }: CanvasWorkspaceProps) {
             onClick={() => setControlsOpen((current) => !current)}
             type="button"
           >
-            {controlsOpen ? "Hide canvas menu" : "Open canvas menu"}
+            {controlsOpen ? "메뉴 숨기기" : "메뉴 열기"}
           </button>
         </div>
 
@@ -801,40 +909,48 @@ export function CanvasWorkspace({ detail }: CanvasWorkspaceProps) {
             <section className={styles.composerPanel}>
               <div className={styles.composerHeader}>
                 <div>
-                  <span className={styles.sectionLabel}>Write next node</span>
-                  <h2 className={styles.composerTitle}>Continue from {getNodeHeading(selectedNode)}</h2>
+                  <span className={styles.sectionLabel}>다음 노드 작성</span>
+                  <h2 className={styles.composerTitle}>{getNodeHeading(selectedNode)}에서 이어쓰기</h2>
                 </div>
               </div>
 
               <div className={styles.composerGrid}>
                 <aside className={styles.composerSidebar}>
-                  <label className={styles.fieldLabel}>Parent context</label>
+                  <label className={styles.fieldLabel}>부모 본문</label>
                   <div className={styles.contextBox}>{selectedNode.content}</div>
-
-                  <SummaryDisclosure baseNodeId={selectedNode.id} canvasId={detail.canvas.id} />
+                  <label className={styles.fieldLabel}>이전 본문</label>
+                  <div className={styles.contextBox}>
+                    {previousNodes.length === 0 ? (
+                      "이전 본문이 없습니다."
+                    ) : (
+                      previousNodes
+                        .map((node, index) => `${index + 1}. ${node.content}`)
+                        .join("\n\n")
+                    )}
+                  </div>
                 </aside>
 
                 <div className={styles.composerMain}>
                   <label className={styles.fieldLabel} htmlFor="story-title">
-                    Node title
+                    노드 제목
                   </label>
                   <input
                     className={styles.composerTitleInput}
                     id="story-title"
                     maxLength={60}
                     onChange={(event) => setDraftTitle(event.target.value)}
-                    placeholder="Give this branch node a title"
+                    placeholder="이 분기의 제목을 입력하세요"
                     value={draftTitle}
                   />
 
                   <label className={styles.fieldLabel} htmlFor="story-draft">
-                    Story content
+                    본문
                   </label>
                   <textarea
                     className={styles.composerTextarea}
                     id="story-draft"
                     onChange={(event) => setDraftText(event.target.value)}
-                    placeholder="Continue the story from the selected node..."
+                    placeholder="선택한 노드에서 이야기를 이어 써 주세요"
                     value={draftText}
                   />
 
@@ -854,23 +970,23 @@ export function CanvasWorkspace({ detail }: CanvasWorkspaceProps) {
                         onChange={(event) => setEndingChecked(event.target.checked)}
                         type="checkbox"
                       />
-                      Mark this node as ending
+                      이 노드를 엔딩으로 표시
                     </label>
                   </div>
 
                   <p className={styles.helperText}>
-                    Summaries stay collapsed until requested. Draft media stays detached until publish succeeds.
+                    이미지는 발행 전까지 현재 작성 중인 초안에만 연결됩니다.
                   </p>
                 </div>
               </div>
 
               <div className={styles.composerFooter}>
                 <span className={styles.helperText}>
-                  {submitMessage ?? "Draft locally here, then publish once the branch feels right."}
+                  {submitMessage ?? "내용을 확인한 뒤 등록하세요."}
                 </span>
                 <div className={styles.buttonRow}>
                   <button className={styles.secondaryButton} onClick={resetWritePanelState} type="button">
-                    Cancel
+                    취소
                   </button>
                   <button
                     className={styles.primaryButton}
@@ -878,7 +994,7 @@ export function CanvasWorkspace({ detail }: CanvasWorkspaceProps) {
                     onClick={handlePublish}
                     type="button"
                   >
-                    {isSubmitting ? "Publishing..." : "Confirm and publish"}
+                    {isSubmitting ? "등록 중..." : "등록하기"}
                   </button>
                 </div>
               </div>
@@ -909,7 +1025,7 @@ function getCanvasPointerPosition(
 
 function getNodeHeading(node: CanvasWorkspaceNode) {
   if (node.parentNodeId === null) {
-    return "Root node";
+    return "루트 노드";
   }
 
   if (node.title?.trim()) {
@@ -917,30 +1033,30 @@ function getNodeHeading(node: CanvasWorkspaceNode) {
   }
 
   if (node.isEnding && node.endingType === "auto-max-depth") {
-    return "Auto ending";
+    return "자동 엔딩";
   }
 
   if (node.isEnding) {
-    return "Ending node";
+    return "엔딩 노드";
   }
 
-  return "Story node";
+  return "스토리 노드";
 }
 
 function getNodeTypeLabel(node: CanvasWorkspaceNode) {
   if (node.parentNodeId === null) {
-    return "Root";
+    return "루트";
   }
 
   if (node.isEnding && node.endingType === "auto-max-depth") {
-    return "Auto ending";
+    return "자동 엔딩";
   }
 
   if (node.isEnding) {
-    return "Ending";
+    return "엔딩";
   }
 
-  return "Branch";
+  return "분기";
 }
 
 function getExcerpt(content: string) {
@@ -1016,4 +1132,15 @@ function scrollViewportFromMinimap(
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
+}
+
+function buildCanvasSyncSignature(detail: CanvasWorkspaceData) {
+  const nodeSignature = detail.nodes
+    .map((node) => `${node.id}:${node.updatedAt}:${node.position.x}:${node.position.y}`)
+    .join("|");
+  const assetSignature = detail.assets
+    .map((asset) => `${asset.id}:${asset.updatedAt}:${asset.nodeId ?? ""}`)
+    .join("|");
+
+  return `${detail.canvas.updatedAt}::${nodeSignature}::${assetSignature}`;
 }
