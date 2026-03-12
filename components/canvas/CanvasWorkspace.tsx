@@ -69,6 +69,7 @@ export function CanvasWorkspace({ detail }: CanvasWorkspaceProps) {
   const [dragState, setDragState] = useState<DragState>(null);
   const [panState, setPanState] = useState<PanState>(null);
   const [miniMapDragging, setMiniMapDragging] = useState(false);
+  const [miniMapCollapsed, setMiniMapCollapsed] = useState(false);
   const [controlsOpen, setControlsOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -438,6 +439,12 @@ export function CanvasWorkspace({ detail }: CanvasWorkspaceProps) {
     const timeout = window.setTimeout(() => setCopied(false), 1500);
     return () => window.clearTimeout(timeout);
   }, [copied]);
+
+  useEffect(() => {
+    if (viewport.width > 0 && viewport.width <= 760) {
+      setMiniMapCollapsed(true);
+    }
+  }, [viewport.width]);
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
@@ -810,61 +817,79 @@ export function CanvasWorkspace({ detail }: CanvasWorkspaceProps) {
           </div>
         </aside>
 
-        <section className={styles.miniMap} data-no-pan="true">
+        <section
+          className={`${styles.miniMap} ${miniMapCollapsed ? styles.miniMapCollapsed : ""}`}
+          data-no-pan="true"
+        >
           <div className={styles.miniMapChrome}>
             <div>
               <h2 className={styles.miniMapTitle}>미니맵</h2>
-              <p className={styles.miniCaption}>클릭하거나 드래그해서 화면을 이동하세요.</p>
+              {!miniMapCollapsed ? (
+                <p className={styles.miniCaption}>클릭하거나 드래그해서 화면을 이동하세요.</p>
+              ) : null}
             </div>
-            <div className={styles.miniMapZoom}>
+            <div className={styles.miniMapControls}>
+              {!miniMapCollapsed ? (
+                <div className={styles.miniMapZoom}>
+                  <button
+                    className={styles.zoomButton}
+                    disabled={zoom <= MIN_ZOOM}
+                    onClick={() => handleZoom(zoom - ZOOM_STEP)}
+                    type="button"
+                  >
+                    -
+                  </button>
+                  <span className={styles.zoomValue}>{Math.round(zoom * 100)}%</span>
+                  <button
+                    className={styles.zoomButton}
+                    disabled={zoom >= MAX_ZOOM}
+                    onClick={() => handleZoom(zoom + ZOOM_STEP)}
+                    type="button"
+                  >
+                    +
+                  </button>
+                </div>
+              ) : null}
               <button
-                className={styles.zoomButton}
-                disabled={zoom <= MIN_ZOOM}
-                onClick={() => handleZoom(zoom - ZOOM_STEP)}
+                className={styles.miniMapToggle}
+                onClick={() => setMiniMapCollapsed((current) => !current)}
                 type="button"
               >
-                -
-              </button>
-              <span className={styles.zoomValue}>{Math.round(zoom * 100)}%</span>
-              <button
-                className={styles.zoomButton}
-                disabled={zoom >= MAX_ZOOM}
-                onClick={() => handleZoom(zoom + ZOOM_STEP)}
-                type="button"
-              >
-                +
+                {miniMapCollapsed ? "펼치기" : "접기"}
               </button>
             </div>
           </div>
-          <div
-            className={styles.miniMapFrame}
-            onPointerDown={handleMiniMapPointerDown}
-            ref={miniMapFrameRef}
-          >
-            {nodes.map((node) => (
+          {!miniMapCollapsed ? (
+            <div
+              className={styles.miniMapFrame}
+              onPointerDown={handleMiniMapPointerDown}
+              ref={miniMapFrameRef}
+            >
+              {nodes.map((node) => (
+                <div
+                  key={`mini-${node.id}`}
+                  className={styles.miniNode}
+                  style={{
+                    left:
+                      MINIMAP_PADDING_X +
+                      ((node.position.x + worldOffsetX) / canvasWidth) * MINIMAP_WIDTH,
+                    top:
+                      MINIMAP_PADDING_Y +
+                      ((node.position.y + worldOffsetY) / canvasHeight) * MINIMAP_HEIGHT,
+                  }}
+                />
+              ))}
               <div
-                key={`mini-${node.id}`}
-                className={styles.miniNode}
+                className={styles.miniViewport}
                 style={{
-                  left:
-                    MINIMAP_PADDING_X +
-                    ((node.position.x + worldOffsetX) / canvasWidth) * MINIMAP_WIDTH,
-                  top:
-                    MINIMAP_PADDING_Y +
-                    ((node.position.y + worldOffsetY) / canvasHeight) * MINIMAP_HEIGHT,
+                  left: MINIMAP_PADDING_X + miniViewportLeft,
+                  top: MINIMAP_PADDING_Y + miniViewportTop,
+                  width: miniViewportWidth,
+                  height: miniViewportHeight,
                 }}
               />
-            ))}
-            <div
-              className={styles.miniViewport}
-              style={{
-                left: MINIMAP_PADDING_X + miniViewportLeft,
-                top: MINIMAP_PADDING_Y + miniViewportTop,
-                width: miniViewportWidth,
-                height: miniViewportHeight,
-              }}
-            />
-          </div>
+            </div>
+          ) : null}
         </section>
 
         <div className={styles.controlDock} data-no-pan="true">
