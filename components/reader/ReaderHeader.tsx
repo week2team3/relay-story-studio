@@ -6,10 +6,11 @@ import styles from "./ReaderPage.module.css";
 type ReaderHeaderProps = {
   title: string;
   sharePath: string;
+  canvasPath: string;
   endingType: "manual" | "auto-max-depth";
 };
 
-export function ReaderHeader({ title, sharePath, endingType }: ReaderHeaderProps) {
+export function ReaderHeader({ title, sharePath, canvasPath, endingType }: ReaderHeaderProps) {
   const [shareUrl, setShareUrl] = useState(sharePath);
   const [copied, setCopied] = useState(false);
 
@@ -45,6 +46,9 @@ export function ReaderHeader({ title, sharePath, endingType }: ReaderHeaderProps
       <h1 className={styles.title}>{title}</h1>
       <div className={styles.metaRow}>
         <span className={styles.metaPill}>{endingType === "manual" ? "User ending" : "Auto ending"}</span>
+        <a className={styles.metaLink} href={canvasPath}>
+          Close reader
+        </a>
         <button
           className={styles.metaLink}
           onClick={handleCopyShareUrl}

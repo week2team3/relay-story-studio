@@ -67,6 +67,27 @@
   padding-top: 32px;
 }
 
+.storyFooter {
+  margin-top: 42px;
+  padding-top: 24px;
+  border-top: 1px solid rgba(61, 41, 24, 0.12);
+}
+
+.footerLabel {
+  margin: 0;
+  font-size: 0.78rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #925338;
+}
+
+.footerNames {
+  margin: 14px 0 0;
+  font-size: 1rem;
+  line-height: 1.8;
+  color: #4d3828;
+}
+
 .textBlock {
   display: grid;
   gap: 18px;
@@ -108,4 +129,3 @@
     line-height: 1.82;
   }
 }
-

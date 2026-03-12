@@ -15,6 +15,7 @@ import type { CanvasDetail, NodePosition, ParticipatedCanvas } from "@/lib/types
 import { serializeCanvas, serializeNode, serializeParticipationCanvas } from "@/lib/utils/serializers";
 import { generateShareKey } from "@/lib/utils/share-key";
 import { toObjectId } from "@/lib/utils/object-id";
+import { loadAuthorNicknameMap } from "@/lib/users/authors";
 import { AssetModel, CanvasModel, NodeModel, ParticipationModel } from "@/models";
 
 const DEFAULT_MAX_USER_NODES = 12;
@@ -305,10 +306,15 @@ export async function createCanvasWithRoot(
     };
   });
 
+  const authorNicknameMap = await loadAuthorNicknameMap([creatorId]);
+  const authorNickname = authorNicknameMap.get(creatorId.toString()) ?? null;
+
   return {
     canvas: serializeCanvas(result.canvas),
-    rootNode: serializeNode(result.rootNode),
-    autoEndingNode: result.autoEndingNode ? serializeNode(result.autoEndingNode) : null
+    rootNode: serializeNode(result.rootNode, { authorNickname }),
+    autoEndingNode: result.autoEndingNode
+      ? serializeNode(result.autoEndingNode, { authorNickname })
+      : null
   };
 }
 
@@ -353,6 +359,7 @@ export async function getCanvasDetailByShareKey(
     depth: 1,
     createdAt: 1
   });
+  const authorNicknameMap = await loadAuthorNicknameMap(nodes.map((node) => node.createdBy));
   const assetIds = nodes.flatMap((node) => node.imageAssetIds.map((assetId) => assetId.toString()));
   const assets = assetIds.length
     ? await AssetModel.find({
@@ -369,7 +376,11 @@ export async function getCanvasDetailByShareKey(
 
   return {
     canvas: serializeCanvas(canvas),
-    nodes: nodes.map(serializeNode),
+    nodes: nodes.map((node) =>
+      serializeNode(node, {
+        authorNickname: authorNicknameMap.get(node.createdBy.toString()) ?? null
+      })
+    ),
     assets: assetIds.flatMap((assetId) => {
       const asset = assetMap.get(assetId);
       return asset ? [asset] : [];
@@ -481,9 +492,14 @@ export async function createNode(
     };
   });
 
+  const authorNicknameMap = await loadAuthorNicknameMap([createdBy]);
+  const authorNickname = authorNicknameMap.get(createdBy.toString()) ?? null;
+
   return {
-    node: serializeNode(result.node),
-    autoEndingNode: result.autoEndingNode ? serializeNode(result.autoEndingNode) : null
+    node: serializeNode(result.node, { authorNickname }),
+    autoEndingNode: result.autoEndingNode
+      ? serializeNode(result.autoEndingNode, { authorNickname })
+      : null
   };
 }
 
@@ -515,9 +531,11 @@ export async function updateNodePosition(
   }
 
   await touchParticipation(node.canvasId, viewerId, null);
+  const authorNicknameMap = await loadAuthorNicknameMap([node.createdBy]);
 
   return {
-    node: serializeNode(node)
+    node: serializeNode(node, {
+      authorNickname: authorNicknameMap.get(node.createdBy.toString()) ?? null
+    })
   };
 }
-

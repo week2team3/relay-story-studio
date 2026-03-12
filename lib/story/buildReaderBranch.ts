@@ -74,12 +74,20 @@ export async function buildReaderBranch(shareKey: string, endingNodeId: string):
     segments.push(...buildImageSegments(node.id, nodeAssets));
   }
 
+  const participantNicknames = Array.from(
+    new Set(
+      nodes
+        .filter((node) => node.nodeKind === "user")
+        .flatMap((node) => (node.authorNickname?.trim() ? [node.authorNickname.trim()] : []))
+    )
+  );
+
   return {
     canvas,
     endingNodeId: endingNode.id,
     endingType: endingNode.endingType ?? "manual",
     sharePath: `/read/${canvas.shareKey}/${endingNode.id}`,
-    segments
+    segments,
+    participantNicknames
   };
 }
-

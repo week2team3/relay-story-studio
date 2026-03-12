@@ -647,8 +647,13 @@ export function CanvasWorkspace({ detail }: CanvasWorkspaceProps) {
           <div className={styles.drawerContent} data-no-pan="true">
             <span className={styles.sectionLabel}>Selected node</span>
             <h2 className={styles.drawerTitle}>{getNodeHeading(selectedNode)}</h2>
-            <div className={styles.metaRow}>
-              {getNodeTypeLabel(selectedNode)} · {formatNodeTimestamp(selectedNode.createdAt)}
+            <div className={styles.drawerMetaStack}>
+              <div className={styles.metaRow}>
+                {getNodeTypeLabel(selectedNode)} · {formatNodeTimestamp(selectedNode.createdAt)}
+              </div>
+              <div className={styles.authorRow}>
+                Written by {selectedNode.authorNickname?.trim() || "Unknown writer"}
+              </div>
             </div>
             {selectedNodeAssets.length > 0 ? (
               <div className={styles.drawerAssetGrid}>
@@ -664,24 +669,26 @@ export function CanvasWorkspace({ detail }: CanvasWorkspaceProps) {
               </div>
             ) : null}
             <p className={styles.bodyCopy}>{selectedNode.content}</p>
-            <div className={styles.buttonRow}>
-              {selectedNode.isEnding ? (
-                <a className={styles.tertiaryButton} href={readHref ?? shareHref}>
-                  Open reader
-                </a>
-              ) : viewerMode === "authenticated" ? (
-                <button
-                  className={styles.primaryButton}
-                  onClick={() => setWriteOpen(true)}
-                  type="button"
-                >
-                  Write next node
-                </button>
-              ) : (
-                <a className={styles.primaryButton} href={`/login?next=${encodeURIComponent(shareHref)}`}>
-                  Login to write
-                </a>
-              )}
+            <div className={styles.drawerActions}>
+              <div className={styles.buttonRow}>
+                {selectedNode.isEnding ? (
+                  <a className={styles.tertiaryButton} href={readHref ?? shareHref}>
+                    Open reader
+                  </a>
+                ) : viewerMode === "authenticated" ? (
+                  <button
+                    className={styles.primaryButton}
+                    onClick={() => setWriteOpen(true)}
+                    type="button"
+                  >
+                    Write next node
+                  </button>
+                ) : (
+                  <a className={styles.primaryButton} href={`/login?next=${encodeURIComponent(shareHref)}`}>
+                    Login to write
+                  </a>
+                )}
+              </div>
             </div>
 
             {submitMessage && !writeOpen ? <p className={styles.helperText}>{submitMessage}</p> : null}

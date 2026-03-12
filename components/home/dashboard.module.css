@@ -22,6 +22,50 @@
   gap: 24px;
 }
 
+.heroCopy {
+  display: grid;
+  gap: 10px;
+  max-width: 760px;
+}
+
+.heroEyebrow {
+  margin: 0;
+  color: var(--accent-strong);
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.heroGreeting {
+  margin: 0;
+  color: rgba(77, 56, 40, 0.72);
+  font-size: 0.94rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.heroTitle {
+  margin: 0;
+  font-size: clamp(2.35rem, 5.8vw, 4.6rem);
+  line-height: 0.94;
+  letter-spacing: -0.035em;
+  text-wrap: balance;
+}
+
+.heroTitle span {
+  display: block;
+}
+
+.heroBody {
+  max-width: 62ch;
+  margin: 0;
+  color: var(--muted);
+  font-size: 1.02rem;
+  line-height: 1.72;
+}
+
 .section {
   padding: 24px;
   display: grid;

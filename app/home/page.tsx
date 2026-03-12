@@ -19,19 +19,21 @@ export default async function HomePage() {
       <div className={styles.stack}>
         <section className={`glass-panel ${styles.header}`}>
           <div className={styles.headerRow}>
-            <div className="stack">
-              <p className="eyebrow">Writer Home</p>
-              <h1 className="headline" style={{ fontSize: "clamp(2.2rem, 5vw, 4.2rem)" }}>
-                {session.nickname}, your relay workspace is live.
+            <div className={styles.heroCopy}>
+              <p className={styles.heroEyebrow}>Writer Home</p>
+              <p className={styles.heroGreeting}>{session.nickname}</p>
+              <h1 className={styles.heroTitle}>
+                <span>Your relay workspace</span>
+                <span>is ready for the next branch.</span>
               </h1>
             </div>
 
             <LogoutButton />
           </div>
 
-          <p className="body-copy" style={{ maxWidth: "64ch" }}>
-            Your relay canvases open into the full canvas workspace now. JSON routes remain
-            available for debugging, but the primary path is the visual canvas UI.
+          <p className={styles.heroBody}>
+            Open a canvas, pick the branch you want, and keep the story moving inside the visual
+            workspace. The home view stays focused on writing, not on raw contracts.
           </p>
         </section>
 

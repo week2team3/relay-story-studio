@@ -35,6 +35,7 @@ export type Node = {
   imageAssetIds: string[];
   position: NodePosition;
   createdBy: string;
+  authorNickname: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -80,6 +81,7 @@ export type ReaderBranchContent = {
   endingType: Exclude<EndingType, null>;
   sharePath: string;
   segments: ReaderSegment[];
+  participantNicknames: string[];
 };
 
 export type CanvasDetail = {

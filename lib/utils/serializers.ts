@@ -41,7 +41,12 @@ export function serializeCanvas(canvas: CanvasDocument): Canvas {
   };
 }
 
-export function serializeNode(node: NodeDocument): Node {
+export function serializeNode(
+  node: NodeDocument,
+  options?: {
+    authorNickname?: string | null;
+  }
+): Node {
   return {
     id: node._id.toString(),
     canvasId: node.canvasId.toString(),
@@ -60,6 +65,7 @@ export function serializeNode(node: NodeDocument): Node {
       y: node.position.y
     },
     createdBy: node.createdBy.toString(),
+    authorNickname: options?.authorNickname ?? null,
     createdAt: node.createdAt.toISOString(),
     updatedAt: node.updatedAt.toISOString()
   };

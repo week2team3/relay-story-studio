@@ -1,6 +1,7 @@
 import { connectToDatabase } from "@/lib/db/mongoose";
 import { badRequest, notFound } from "@/lib/server/errors";
 import type { Node } from "@/lib/types/domain";
+import { loadAuthorNicknameMap } from "@/lib/users/authors";
 import { serializeNode } from "@/lib/utils/serializers";
 import { CanvasModel, NodeModel } from "@/models";
 
@@ -32,7 +33,18 @@ export async function assembleBranch({ shareKey, endingNodeId }: AssembleBranchI
   const branchNodes = await NodeModel.find({
     _id: { $in: orderedIds }
   });
-  const nodeMap = new Map(branchNodes.map((node) => [node._id.toString(), serializeNode(node)]));
+  const authorNicknameMap = await loadAuthorNicknameMap(branchNodes.map((node) => node.createdBy));
+  const nodeMap = new Map(
+    branchNodes.map((node) => [
+      node._id.toString(),
+      serializeNode(node, {
+        authorNickname: authorNicknameMap.get(node.createdBy.toString()) ?? null
+      })
+    ])
+  );
+  const serializedEndingNode = serializeNode(endingNode, {
+    authorNickname: authorNicknameMap.get(endingNode.createdBy.toString()) ?? null
+  });
   const orderedNodes = orderedIds.map((nodeId) => {
     const node = nodeMap.get(nodeId);
 
@@ -49,8 +61,7 @@ export async function assembleBranch({ shareKey, endingNodeId }: AssembleBranchI
       title: canvas.title,
       shareKey: canvas.shareKey
     },
-    endingNode: serializeNode(endingNode),
+    endingNode: serializedEndingNode,
     nodes: orderedNodes satisfies Node[]
   };
 }
-
