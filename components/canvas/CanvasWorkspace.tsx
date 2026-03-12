@@ -717,7 +717,8 @@ export function CanvasWorkspace({ detail }: CanvasWorkspaceProps) {
             </svg>
 
             {nodes.map((node) => {
-              const typeLabel = getNodeTypeLabel(node);
+              const badgeLabel = getNodeBadgeLabel(node);
+              const badgeTooltip = getNodeBadgeTooltip(node, detail.canvas.maxUserNodesPerBranch);
 
               return (
                 <button
@@ -737,7 +738,13 @@ export function CanvasWorkspace({ detail }: CanvasWorkspaceProps) {
                   }}
                   type="button"
                 >
-                  <span className={styles.nodeType}>{typeLabel}</span>
+                  <span
+                    className={styles.nodeType}
+                    data-tooltip={badgeTooltip}
+                    title={badgeTooltip}
+                  >
+                    {badgeLabel}
+                  </span>
                   <h2 className={styles.nodeTitle}>{getNodeHeading(node)}</h2>
                   <p className={styles.nodeExcerpt}>{getExcerpt(node.content)}</p>
                 </button>
@@ -1057,6 +1064,24 @@ function getNodeTypeLabel(node: CanvasWorkspaceNode) {
   }
 
   return "분기";
+}
+
+function getNodeBadgeLabel(node: CanvasWorkspaceNode) {
+  return `${node.depth + 1}`;
+}
+
+function getNodeBadgeTooltip(node: CanvasWorkspaceNode, maxUserNodesPerBranch: number) {
+  if (node.isEnding) {
+    return "엔딩 노드입니다. 이후에는 새 노드를 추가할 수 없습니다.";
+  }
+
+  const remainingUserNodes = Math.max(0, maxUserNodesPerBranch - node.userNodeCountInPath);
+
+  if (remainingUserNodes === 0) {
+    return "이 노드 뒤에는 더 이상 사용자 노드를 추가할 수 없습니다.";
+  }
+
+  return `이 노드 뒤에는 사용자 노드를 최대 ${remainingUserNodes}개 더 추가할 수 있습니다.`;
 }
 
 function getExcerpt(content: string) {
